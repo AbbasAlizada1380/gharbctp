@@ -3,7 +3,7 @@ import axios from "axios";
 import Swal from "sweetalert2";
 
 import BillSummary from "./BillSummary.jsx";
-// import PrintOrderBill from "./PrintOrderBill.jsx";
+import PrintOrderBill from "./PrintOrderBill.jsx";
 import { FaCheck, FaUndo } from "react-icons/fa";
 import { ImCross } from "react-icons/im";
 import Pagination from "../pagination/Pagination.jsx";
@@ -29,6 +29,7 @@ import {
 } from "react-icons/fa";
 import SearchBar from "../searching/SearchBar.jsx";
 import { useSelector } from "react-redux";
+import Loading from "../../loading.jsx";
 const OrdersList = () => {
   const [record, setRecord] = useState({
     customer: { name: "", phone_number: "" },
@@ -50,13 +51,16 @@ const OrdersList = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [activeSection, setActiveSection] = useState("digital");
   const [editMode, setEditMode] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
 
   const fetchOrders = async (page = 1) => {
+    setLoading(true)
     const data = await getOrders(page, 20);
     setOrders(data.orders);
     setCurrentPage(data.currentPage);
     setTotalPages(data.totalPages);
+    setLoading(false)
   };
 
   const onPageChange = (pageNumber) => {
@@ -107,22 +111,33 @@ const OrdersList = () => {
 
       // Only update state if we got a valid response
       if (updated && updated.id) {
+        // Force local state values
+        const locallyUpdated = {
+          ...updated,
+          remained: 0,
+          recip: updated.total, // or recip if that's your exact field
+        };
+
         // Update main orders
-        setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+        setOrders((prev) =>
+          prev.map((o) => (o.id === order.id ? locallyUpdated : o))
+        );
 
         // Update search result if it exists
         setSearchResult((prev) =>
           prev?.length
-            ? prev.map((o) => (o.id === order.id ? updated : o))
+            ? prev.map((o) => (o.id === order.id ? locallyUpdated : o))
             : prev
         );
       }
-      // If user canceled (updated is null), do nothing
     } catch (err) {
       console.error("Error paying remaining:", err);
     }
   };
 
+  if (loading) {
+    return (<Loading />)
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6 space-y-8">
       {/* Header Section */}
@@ -271,7 +286,7 @@ const OrdersList = () => {
                         <FaEye className="text-cyan-800" size={20} />
                       </button>
 
-                      {currentUser.role == "admin" && (
+                      {/* {currentUser.role == "admin" && (
                         <button
                           onClick={async () => {
                             try {
@@ -287,7 +302,7 @@ const OrdersList = () => {
                         >
                           <FaTimes className="text-red-600" size={20} />
                         </button>
-                      )}
+                      )} */}
                     </div>
                   </td>
                 </tr>
@@ -312,13 +327,13 @@ const OrdersList = () => {
       </div>
 
       {/* Print Bill Modal */}
-      {/* {isBillOpen && (
+      {isBillOpen && (
         <PrintOrderBill
           isOpen={isBillOpen}
           onClose={handleCloseBill}
           order={selectedOrder}
         />
-      )} */}
+      )}
     </div>
   );
 };

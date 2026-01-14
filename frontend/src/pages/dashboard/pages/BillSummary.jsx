@@ -2,22 +2,9 @@ import React from "react";
 import { CgNotes } from "react-icons/cg";
 const BillSummary = ({ record }) => {
   return (
-    <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg shadow-lg border border-gray-200 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-blue-100 rounded-lg">
-          <div className="">
-            <CgNotes className="text-cyan-800" size={24} />
-          </div>
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">خلاصه بیل</h2>
-          <p className="text-gray-600 text-sm">جمع‌بندی کلی هزینه‌ها</p>
-        </div>
-      </div>
-
+    <div className="">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 ">
         {/* Digital Printing Total */}
         <div className="bg-white rounded-md p-4 border border-cyan-100 shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex items-center justify-between">
@@ -97,23 +84,6 @@ const BillSummary = ({ record }) => {
           </div>
         </div>
       </div> */}
-
-      {/* Status Indicator */}
-      <div className="mt-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              parseFloat(record.total) > 0 ? "bg-green-500" : "bg-gray-400"
-            }`}
-          ></div>
-          <span className="text-sm text-gray-600">
-            {parseFloat(record.total) > 0 ? "فاکتور فعال" : "فاکتور خالی"}
-          </span>
-        </div>
-        <div className="text-sm text-gray-500">
-          {new Date().toLocaleDateString("fa-IR")}
-        </div>
-      </div>
     </div>
   );
 };

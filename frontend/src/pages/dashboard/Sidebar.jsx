@@ -39,15 +39,17 @@ const Sidebar = ({ setActiveComponent }) => {
     });
   };
   const AllComponents = [
-    // { name: "main page", value: "home", icon: <MdOutlineDashboardCustomize /> },
-    { name: "Bills", value: "Bills", icon: <MdAddShoppingCart /> },
+    { name: "صفحه اصلی", value: "home", icon: <MdOutlineDashboardCustomize /> },
+    { name: "سفارشات جدید", value: "Orders", icon: <MdAddShoppingCart /> },
     // { name: "لیست سفارشات ", value: "OrdersList", icon: <FaList /> },
-    // {
-    //   name: " ثبت کاربر جدید",
-    //   value: "AddUser",
-    //   icon: <LucideUserRoundPlus />,
-    // },
-    // { name: "logout", value: "signout", icon: <FaSignOutAlt /> },
+    { name: "مشتری ها", value: "Customers", icon: <FaList /> },
+    { name: "گدام", value: "Stock", icon: <FaList /> },
+    {
+      name: " ثبت کاربر جدید",
+      value: "AddUser",
+      icon: <LucideUserRoundPlus />,
+    },
+    { name: "خروج", value: "signout", icon: <FaSignOutAlt /> },
   ];
 
   let accessibleComponents = [];
@@ -91,12 +93,12 @@ const Sidebar = ({ setActiveComponent }) => {
         </div>
 
         <span className="text-lg font-semibold  text-white whitespace-nowrap">
-     salsal brand
+      غرب سی تی پی
         </span>
       </header>
 
       <ul className=" mr-1 px-3">
-        {AllComponents.map((component, index) => (
+        {accessibleComponents.map((component, index) => (
           <li key={index} className="relative group cursor-pointer">
             {component.value === "signout" ? (
               <a
