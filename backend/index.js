@@ -1,15 +1,18 @@
 import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
-import multer from "multer";
 import userRout from "./routes/userRout.js";
 import sequelize from "./dbconnection.js";
 import path, { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import cookieParser from "cookie-parser";
-import OrdersRout from "./routes/OrdersRoute.js";
 import ReportRouter from "./routes/ordersReportRout.js";
-const FRONT_URL=process.env.FRONT_URL
+import CustomerRoute from "./routes/CustomersRoute.js";
+import OrderItemRoute from "./routes/OrderItemsRoute.js";
+import IncomeRoute from "./routes/StockIncomeRoute.js";
+import OutgoingRoute from "./routes/OutgoingRoute.js";
+import ExistRoute from "./routes/ExistRoute.js";
+const FRONT_URL = process.env.FRONT_URL
 const port = 8038;
 const app = express();
 
@@ -55,8 +58,12 @@ app.use("/uploads", express.static(uploadsDirectory));
 
 // Routes
 app.use("/users", userRout);
-app.use("/orders", OrdersRout);
+app.use("/orderItems", OrderItemRoute);
 app.use("/report", ReportRouter);
+app.use("/stock/income", IncomeRoute);
+app.use("/stock/outgoing", OutgoingRoute);
+app.use("/stock/exist", ExistRoute);
+app.use("/customers", CustomerRoute);
 
 // Sync database and start server
 sequelize

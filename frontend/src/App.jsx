@@ -16,12 +16,12 @@ export default function App() {
         <Routes>
           {/* public routes all users */}
           {/* <Route path="/" element={<HomePage />} /> */}
-          {/* <Route path="/forgot_password" element={<EmailEntry />} />
+          <Route path="/forgot_password" element={<EmailEntry />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/" element={<Signin />} />
-          <Route path="*" element={<Signin />} /> */}
-            <Route path="/" element={<DashboardPage />} />
+          <Route path="*" element={<Signin />} />
           <Route element={<PrivateRoute />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
           </Route>
           <Route element={<OnlyAdminPrivateRoute />}></Route>
         </Routes>

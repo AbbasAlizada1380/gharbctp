@@ -9,7 +9,6 @@ lerna-debug.log*
 
 node_modules
 dist
-.vite
 .env
 dist-ssr
 *.local
@@ -25,3 +24,4 @@ dist-ssr
 *.sln
 *.sw?
 *.env
+*.vite
