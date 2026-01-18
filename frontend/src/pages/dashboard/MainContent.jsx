@@ -2,20 +2,20 @@
 import Dashboard from "./pages/dashboard";
 // import S_Transaction from "./pages/RentManager";
 import Report from "./pages/reports";
-import FinanceComponent from "./pages/Financial";
 import Orders from "./pages/Orders";
 import OrdersList from "./pages/OrdersList";
 import AddUser from "./pages/AddUser";
-import Bills from "./pages/Bills";
+import Customers from "./pages/Customers";
+import Stock from "./pages/Stock";
 const MainContent = ({ activeComponent }) => {
   const renderContent = () => {
     switch (activeComponent) {
       case "dashboard":
         return <Dashboard />;
-      case "Bills":
-        return <Bills />;
-      case "BlockManager":
-        return <BlockManager />;
+      case "ActiveAthletes":
+        return <ActiveAthletes />;
+      case "Customers":
+        return <Customers />;
       case "user managements":
         return <UserManagement />;
       case "report":
@@ -24,8 +24,8 @@ const MainContent = ({ activeComponent }) => {
         return <Salaries />;
       case "setting":
         return <Setting />;
-      case "ServiceManager":
-        return <ServiceManager />;
+      case "Stock":
+        return <Stock />;
       case "Fees":
         return <Fees />;
       case "Orders":
@@ -36,7 +36,7 @@ const MainContent = ({ activeComponent }) => {
         return <AddUser />;
 
       default:
-        return <Bills />;
+        return <Dashboard />;
     }
   };
 

@@ -26,7 +26,8 @@ const useSignin = () => {
       if (signIn.fulfilled.match(resultAction)) {
         console.log("✅ Login successful:", resultAction.payload);
         // optional navigation after login
-        navigate("/dashboard");
+       navigate("/dashboard", { replace: true });
+
       } else {
         console.error("❌ Login failed:", resultAction.payload);
       }

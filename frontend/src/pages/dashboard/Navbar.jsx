@@ -36,27 +36,27 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // useEffect(() => {
-  //   const updateDate = () => {
-  //     const now = moment();
-  //     const jMonthIndex = now.jMonth();
-  //     const shamsiMonthName = shamsiMonths[jMonthIndex];
+  useEffect(() => {
+    const updateDate = () => {
+      const now = moment();
+      const jMonthIndex = now.jMonth();
+      const shamsiMonthName = shamsiMonths[jMonthIndex];
 
-  //     const newDateInfo = {
-  //       day: now.format("dddd"),
-  //       year: now.format("jYYYY"),
-  //       month: shamsiMonthName,
-  //       dateNumber: now.format("jD"),
-  //       time: now.format("HH:mm"),
-  //     };
+      const newDateInfo = {
+        day: now.format("dddd"),
+        year: now.format("jYYYY"),
+        month: shamsiMonthName,
+        dateNumber: now.format("jD"),
+        time: now.format("HH:mm"),
+      };
 
-  //     setDateInfo(newDateInfo);
-  //   };
+      setDateInfo(newDateInfo);
+    };
 
-  //   updateDate();
-  //   const timer = setInterval(updateDate, 60000);
-  //   return () => clearInterval(timer);
-  // }, []);
+    updateDate();
+    const timer = setInterval(updateDate, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -102,8 +102,8 @@ const Navbar = () => {
               <MdDashboard size={20} className="text-white" />
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-lg font-bold text-gray-800">salsal brand</h1>
-              <p className="text-xs text-gray-500">mangement system of salsal brand</p>
+              <h1 className="text-lg font-bold text-gray-800"> غرب سی تی پی</h1>
+              <p className="text-xs text-gray-500">سیستم مدیریت  غرب سی تی پی</p>
             </div>
           </div>
         </div>
