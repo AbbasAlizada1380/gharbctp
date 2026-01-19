@@ -1,27 +1,67 @@
 import Customer from "../Models/Customers.js";
+import Remain from "../Models/Remain.js";
 import { Op } from "sequelize";
 
 /* ===========================
    Create Customer
 =========================== */
 export const createCustomer = async (req, res) => {
+  const transaction = await Customer.sequelize.transaction();
   try {
-    const { fullname, phoneNumber, isActive } = req.body;
+    const { fullname, phoneNumber, isActive, initialRemain } = req.body;
 
     if (!fullname) {
       return res.status(400).json({ message: "Full name is required" });
     }
 
+    // Create customer within transaction
     const customer = await Customer.create({
       fullname,
       phoneNumber,
       isActive: isActive ?? true,
-    });
+    }, { transaction });
 
-    res.status(201).json(customer);
+    // Create initial Remain record for the customer
+    const remain = await Remain.create({
+      customerId: customer.id,
+      orderId: initialRemain?.orderId || [], // Accept initial order IDs if provided
+    }, { transaction });
+
+    // Commit transaction
+    await transaction.commit();
+
+    res.status(201).json({
+      success: true,
+      message: "Customer created successfully",
+      data: {
+        customer,
+        remain: {
+          id: remain.id,
+          customerId: remain.customerId,
+          orderId: remain.orderId,
+          createdAt: remain.createdAt
+        }
+      }
+    });
   } catch (error) {
+    // Rollback transaction on error
+    await transaction.rollback();
     console.error(error);
-    res.status(500).json({ message: "Error creating customer", error });
+    
+    // Handle specific errors
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ 
+        success: false,
+        message: "Phone number already exists",
+        error: error.errors.map(err => err.message)
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: "Error creating customer", 
+      error: error.message 
+    });
   }
 };
 export const getActiveCustomers = async (req, res) => {

@@ -3,7 +3,6 @@ import Dashboard from "./pages/dashboard";
 // import S_Transaction from "./pages/RentManager";
 import Report from "./pages/reports";
 import Orders from "./pages/Orders";
-import OrdersList from "./pages/OrdersList";
 import AddUser from "./pages/AddUser";
 import Customers from "./pages/Customers";
 import Stock from "./pages/Stock";
@@ -30,8 +29,6 @@ const MainContent = ({ activeComponent }) => {
         return <Fees />;
       case "Orders":
         return <Orders />;
-      case "OrdersList":
-        return <OrdersList />;
       case "AddUser":
         return <AddUser />;
 

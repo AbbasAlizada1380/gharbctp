@@ -7,20 +7,19 @@ const OrderItem = sequelize.define(
   {
     size: {
       type: DataTypes.STRING,
-      allowNull: false,
     },
 
     qnty: {
       type: DataTypes.INTEGER,
-      allowNull: false,
       validate: {
         min: 1,
       },
     },
-
+    fileName: {
+      type: DataTypes.STRING,
+    },
     price: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
       validate: {
         min: 0,
       },
@@ -28,21 +27,14 @@ const OrderItem = sequelize.define(
 
     money: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
+      validate: {
+        min: 0,
+      }},
+    receipt: {
+      type: DataTypes.DECIMAL(10, 2),
       validate: {
         min: 0,
       },
-    },
-
-    customerId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: Customer,
-        key: "id",
-      },
-      onUpdate: "CASCADE",
-      onDelete: "RESTRICT", // or "CASCADE" if you want
     },
   },
   {

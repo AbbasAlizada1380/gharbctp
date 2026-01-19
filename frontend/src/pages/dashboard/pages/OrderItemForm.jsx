@@ -3,8 +3,13 @@ import { FaTrash } from "react-icons/fa";
 import sizes from "../services/Size.js";
 
 const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDelete }) => {
+  // Check if item is completely empty
+  const isEmpty = !item.size && !item.qnty && !item.price && !item.fileName;
+
   return (
-    <div className="p-4 border border-gray-300 rounded-md relative bg-gray-50">
+    <div className={`p-4 border rounded-md relative ${isEmpty ? 'bg-gray-50 border-dashed border-gray-300' : 'bg-white border-gray-300'}`}>
+     
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Size */}
         <div>
@@ -12,8 +17,7 @@ const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDele
           <select
             value={item.size}
             onChange={(e) => handleItemChange(index, "size", e.target.value)}
-            required
-            className="w-full border rounded-md px-3 py-2"
+            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
           >
             <option value="">انتخاب سایز</option>
             {sizes.map((s) => (
@@ -32,19 +36,8 @@ const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDele
             min="1"
             value={item.qnty}
             onChange={(e) => handleItemChange(index, "qnty", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          />
-        </div>
-
-        {/* Price */}
-        <div>
-          <label className="block mb-1 text-sm font-medium">قیمت</label>
-          <input
-            type="number"
-            min="0"
-            value={item.price}
-            onChange={(e) => handleItemChange(index, "price", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
+            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
+            placeholder="0"
           />
         </div>
 
@@ -55,8 +48,21 @@ const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDele
             type="text"
             value={item.fileName}
             onChange={(e) => handleItemChange(index, "fileName", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
+            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
             placeholder="example.pdf"
+          />
+        </div>
+        
+        {/* Price */}
+        <div>
+          <label className="block mb-1 text-sm font-medium">قیمت</label>
+          <input
+            type="number"
+            min="0"
+            value={item.price}
+            onChange={(e) => handleItemChange(index, "price", e.target.value)}
+            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
+            placeholder="0"
           />
         </div>
 
@@ -66,19 +72,21 @@ const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDele
           <input
             type="number"
             min="0"
-            value={item.money}
             onChange={(e) => handleItemChange(index, "money", e.target.value)}
+            value={item.money || ""}
             className="w-full border rounded-md px-3 py-2 bg-gray-50"
+            placeholder="0"
           />
         </div>
       </div>
 
-      {/* Delete Button */}
+      {/* Delete Button - Only show if canDelete (more than 5 items) */}
       {canDelete && (
         <button
           type="button"
           onClick={() => deleteOrderItem(index)}
-          className="absolute top-2 right-2 text-red-500"
+          className="absolute top-6 right-2 text-red-500 hover:text-red-700"
+          title="حذف این مورد"
         >
           <FaTrash />
         </button>

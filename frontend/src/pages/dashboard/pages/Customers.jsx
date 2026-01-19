@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import Pagination from "../pagination/Pagination";
+import RemainOrderItems from "./RemainOrderItems"; // adjust path if needed
 import { FaUsers, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -9,7 +10,7 @@ const limit = 10;
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
-
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -166,25 +167,27 @@ const Customers = () => {
                 </tr>
               ) : customers.length ? (
                 customers.map((c, index) => (
-                  <tr key={c.id} className="hover:bg-gray-50">
+                  <tr
+                    key={c.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => setSelectedCustomer(c)} // <-- select customer
+                  >
                     <td className="border px-4 py-2">
                       {(currentPage - 1) * limit + index + 1}
                     </td>
                     <td className="border px-4 py-2">{c.fullname}</td>
                     <td className="border px-4 py-2">{c.phoneNumber}</td>
-                    <td className="border px-4 py-2">
-                      {c.isActive ? "فعال" : "غیرفعال"}
-                    </td>
+                    <td className="border px-4 py-2">{c.isActive ? "فعال" : "غیرفعال"}</td>
                     <td className="border px-4 py-2">
                       <div className="flex justify-center gap-2">
                         <button
-                          onClick={() => handleEdit(c)}
+                          onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
                           className="h-8 w-8 flex items-center justify-center border border-cyan-800 rounded-md hover:scale-105"
                         >
                           <FaEdit className="text-cyan-800" />
                         </button>
                         <button
-                          onClick={() => handleDelete(c.id)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
                           className="h-8 w-8 flex items-center justify-center border border-red-600 rounded-md hover:scale-105"
                         >
                           <FaTrash className="text-red-600" />
@@ -193,6 +196,7 @@ const Customers = () => {
                     </td>
                   </tr>
                 ))
+
               ) : (
                 <tr>
                   <td colSpan="5" className="py-4 text-gray-500">
@@ -270,6 +274,12 @@ const Customers = () => {
           </form>
         </div>
       )}
+      {selectedCustomer && (
+        <div className="mt-8">
+          <RemainOrderItems customer={selectedCustomer} />
+        </div>
+      )}
+
     </div>
   );
 };

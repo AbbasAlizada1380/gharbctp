@@ -45,14 +45,14 @@ const Outgoing = () => {
       setLoading(true);
       const response = await axios.get(`${OUTGOING_API_URL}/${id}`);
       const outgoing = response.data;
-      
+
       // Set form for editing
       setItems([{
         size: outgoing.size || "",
         quantity: outgoing.quantity || ""
       }]);
       setEditingId(id);
-      
+
       // Scroll to form
       document.getElementById('outgoing-form').scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
@@ -188,26 +188,26 @@ const Outgoing = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validate form
     const validationErrors = [];
     items.forEach((item, index) => {
       if (!item.size) validationErrors.push(`سطر ${index + 1}: اندازه را انتخاب کنید`);
       if (!item.quantity || parseFloat(item.quantity) <= 0) validationErrors.push(`سطر ${index + 1}: تعداد معتبر وارد کنید`);
     });
-    
+
     if (validationErrors.length > 0) {
       alert(validationErrors.join("\n"));
       return;
     }
 
     setLoading(true);
-    
+
     try {
       // If editing, update existing outgoing
       if (editingId) {
         await updateOutgoing(editingId, items[0]);
-      } 
+      }
       // If creating, create each item as separate outgoing
       else {
         for (const item of items) {
@@ -234,15 +234,7 @@ const Outgoing = () => {
     return new Date(dateString).toLocaleDateString('fa-IR');
   };
 
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('fa-IR').format(amount);
-  };
 
-  // Format number
-  const formatNumber = (number) => {
-    return new Intl.NumberFormat('fa-IR').format(number);
-  };
 
   return (
     <div className="p-6">
@@ -252,15 +244,15 @@ const Outgoing = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-red-100 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold text-red-800">مجموع تعداد فروش</h3>
-          <p className="text-2xl font-bold">{formatNumber(summary.totalQuantity)} عدد</p>
+          <p className="text-2xl font-bold">{ (summary.totalQuantity)} عدد</p>
         </div>
         <div className="bg-green-100 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold text-green-800">مجموع مبلغ فروش</h3>
-          <p className="text-2xl font-bold">{formatCurrency(summary.totalMoney)} تومان</p>
+          <p className="text-2xl font-bold">{ (summary.totalMoney)}  افغانی</p>
         </div>
         <div className="bg-blue-100 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold text-blue-800">میانگین ارزش فروش</h3>
-          <p className="text-2xl font-bold">{formatCurrency(summary.averageSaleValue)} تومان</p>
+          <p className="text-2xl font-bold">{ (summary.averageSaleValue)}  افغانی</p>
         </div>
       </div>
 
@@ -297,7 +289,7 @@ const Outgoing = () => {
         <h3 className="text-lg font-bold text-cyan-800 mb-4">
           {editingId ? "ویرایش خروجی" : "ثبت خروجی جدید"}
         </h3>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {items.map((item, index) => (
             <div
@@ -323,7 +315,7 @@ const Outgoing = () => {
                 </select>
                 {item.size && stockInfo[item.size] && (
                   <p className="text-xs text-gray-500 mt-1">
-                    موجودی فعلی: {formatNumber(stockInfo[item.size])} عدد
+                    موجودی فعلی: { (stockInfo[item.size])} عدد
                   </p>
                 )}
               </div>
@@ -409,53 +401,81 @@ const Outgoing = () => {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
+              <table className="w-full text-center">
+                <thead className="bg-cyan-50 text-cyan-800">
                   <tr>
-                    <th className="p-3 text-right border">ردیف</th>
-                    <th className="p-3 text-right border">اندازه</th>
-                    <th className="p-3 text-right border">تعداد</th>
-                    <th className="p-3 text-right border">قیمت واحد (میانگین)</th>
-                    <th className="p-3 text-right border">مبلغ کل</th>
-                    <th className="p-3 text-right border">تاریخ</th>
-                    <th className="p-3 text-right border">عملیات</th>
+                    <th className="p-3 border-b font-semibold">#</th>
+                    <th className="p-3 border-b font-semibold">اندازه</th>
+                    <th className="p-3 border-b font-semibold">تعداد (کارتن)</th>
+                    <th className="p-3 border-b font-semibold">قیمت واحد (میانگین)</th>
+                    <th className="p-3 border-b font-semibold">مبلغ کل (افغانی)</th>
+                    <th className="p-3 border-b font-semibold">تاریخ</th>
+                    <th className="p-3 border-b font-semibold">عملیات</th>
                   </tr>
                 </thead>
                 <tbody>
                   {outgoings.map((outgoing, index) => {
                     const unitPrice = parseFloat(outgoing.money) / parseFloat(outgoing.quantity);
+                    const currentStock = stockInfo[outgoing.size] || 0;
+
                     return (
-                      <tr key={outgoing.id} className="hover:bg-gray-50">
-                        <td className="p-3 border">{(currentPage - 1) * 10 + index + 1}</td>
-                        <td className="p-3 border">
-                          <div>
-                            {outgoing.size}
-                            {stockInfo[outgoing.size] && (
-                              <div className="text-xs text-gray-500">
-                                موجودی: {formatNumber(stockInfo[outgoing.size])}
+                      <tr
+                        key={outgoing.id}
+                        className="hover:bg-gray-50 border-b last:border-0 transition-colors"
+                      >
+                        <td className="p-3 text-gray-600">
+                          {(currentPage - 1) * 10 + index + 1}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
+                              {outgoing.size}
+                            </span>
+                            {currentStock > 0 && (
+                              <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                موجودی: { (currentStock)}
                               </div>
                             )}
                           </div>
                         </td>
-                        <td className="p-3 border">{formatNumber(outgoing.quantity)}</td>
-                        <td className="p-3 border">{formatCurrency(unitPrice.toFixed(3))}</td>
-                        <td className="p-3 border font-semibold text-green-700">
-                          {formatCurrency(outgoing.money)}
+                        <td className="p-3">
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
+                            { (outgoing.quantity)}
+                          </span>
                         </td>
-                        <td className="p-3 border">{formatDate(outgoing.createdAt)}</td>
-                        <td className="p-3 border">
-                          <div className="flex gap-2">
+                        <td className="p-3 text-green-700 font-semibold">
+                          { (unitPrice.toFixed(3))}
+                        </td>
+                        <td className="p-3 text-purple-700 font-bold">
+                          { (outgoing.money)}
+                        </td>
+                        <td className="p-3 text-gray-500 text-sm">
+                          {outgoing.createdAt ?
+                            new Date(outgoing.createdAt)
+                              .toLocaleDateString('fa-IR')
+                              .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+                            : '—'
+                          }
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => fetchOutgoingById(outgoing.id)}
-                              className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
+                              className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg"
+                              title="ویرایش"
                             >
-                              ویرایش
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                              </svg>
                             </button>
                             <button
                               onClick={() => deleteOutgoing(outgoing.id)}
-                              className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              title="حذف"
                             >
-                              حذف
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
                             </button>
                           </div>
                         </td>
@@ -463,6 +483,33 @@ const Outgoing = () => {
                     );
                   })}
                 </tbody>
+                {outgoings.length > 0 && (
+                  <tfoot className="bg-gray-50">
+                    <tr>
+                      <td colSpan="2" className="p-3 text-right font-semibold text-gray-700">
+                        مجموع کل:
+                      </td>
+                      <td className="p-3 font-bold text-blue-700">
+                        {outgoings.reduce((sum, outgoing) => sum + (parseFloat(outgoing.quantity) || 0), 0).toLocaleString('en-US')}
+                      </td>
+                      <td className="p-3 font-bold text-green-700">
+                        {outgoings.length > 0
+                          ?  (
+                            (outgoings.reduce((sum, outgoing) => sum + (parseFloat(outgoing.money) || 0), 0) /
+                              outgoings.reduce((sum, outgoing) => sum + (parseFloat(outgoing.quantity) || 0), 0)).toFixed(3)
+                          )
+                          :  (0)
+                        }
+                      </td>
+                      <td className="p-3 font-bold text-purple-700">
+                        { (
+                          outgoings.reduce((sum, outgoing) => sum + (parseFloat(outgoing.money) || 0), 0)
+                        )}
+                      </td>
+                      <td colSpan="2"></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
 
@@ -476,7 +523,7 @@ const Outgoing = () => {
                 >
                   قبلی
                 </button>
-                
+
                 {[...Array(totalPages)].map((_, i) => (
                   <button
                     key={i + 1}
@@ -486,7 +533,7 @@ const Outgoing = () => {
                     {i + 1}
                   </button>
                 ))}
-                
+
                 <button
                   onClick={() => fetchOutgoings(currentPage + 1)}
                   disabled={currentPage === totalPages}

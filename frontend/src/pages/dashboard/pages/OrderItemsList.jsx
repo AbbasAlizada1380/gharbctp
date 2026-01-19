@@ -143,33 +143,6 @@ const OrderItemsList = ({
     }
   };
 
-  // Delete item
-  const handleDelete = async (id) => {
-    if (!window.confirm("آیا مطمئن هستید که می‌خواهید این سفارش را حذف کنید؟")) {
-      return;
-    }
-
-    try {
-      await axios.delete(`${BASE_URL}/orderItems/${id}`);
-      
-      // Remove from local state
-      setOrderItems(prev => prev.filter(item => item.id !== id));
-      
-      alert("سفارش با موفقیت حذف شد");
-      
-      // Refresh if needed
-      if (orderItems.length === 1 && currentPage > 1) {
-        setCurrentPage(prev => prev - 1);
-      } else {
-        fetchOrderItems();
-      }
-      
-    } catch (err) {
-      console.error("Error deleting order item:", err);
-      alert(err.response?.data?.message || "خطا در حذف سفارش");
-    }
-  };
-
   // Calculate totals
   const calculateTotals = () => {
     return orderItems.reduce((acc, item) => {
@@ -182,10 +155,14 @@ const OrderItemsList = ({
   const totals = calculateTotals();
 
   // Format date
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fa-IR');
-  };
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  // Format in 'fa-IR' locale
+  const formatted = date.toLocaleDateString("fa-IR");
+  // Replace Persian/Arabic digits with English digits
+  return formatted.replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
+};
+
 
   // Check if there are changes
   const hasChanges = () => {
@@ -437,14 +414,6 @@ const OrderItemsList = ({
                             disabled={editingId !== null}
                           >
                             <FaEdit />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                            title="حذف"
-                            disabled={editingId !== null}
-                          >
-                            <FaTrash />
                           </button>
                         </>
                       )}

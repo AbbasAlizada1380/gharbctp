@@ -2,18 +2,30 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaPlus } from "react-icons/fa";
 import OrderItemForm from "./OrderItemForm";
+import OrderItemsList from "./OrderItemsList";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
+
+// Create 5 empty order items
+const createEmptyOrderItems = (count = 5) => {
+  return Array.from({ length: count }, () => ({
+    size: "",
+    qnty: "",
+    price: "",
+    money: "",
+    fileName: ""
+  }));
+};
 
 const Orders = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [addingCustomer, setAddingCustomer] = useState(false); // toggle new customer input
+  const [addingCustomer, setAddingCustomer] = useState(false);
 
   const [form, setForm] = useState({
     customer: "",
-    newCustomerName: "", // for adding new customer
-    orderItems: [{ size: "", qnty: "", price: "", money: "", fileName: "" }],
+    newCustomerName: "",
+    orderItems: createEmptyOrderItems(5), // Start with 5 empty items
   });
 
   /* ===============================
@@ -51,6 +63,7 @@ const Orders = () => {
       const updatedItems = [...prev.orderItems];
       updatedItems[index][name] = value;
 
+      // Auto-calculate money when qnty or price changes
       if (name === "qnty" || name === "price") {
         const qnty = Number(updatedItems[index].qnty) || 0;
         const price = Number(updatedItems[index].price) || 0;
@@ -83,26 +96,42 @@ const Orders = () => {
   };
 
   /* ===============================
-     Submit
+     Submit - Filter out empty items
   =============================== */
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Filter out completely empty order items (all fields empty)
+    const nonEmptyOrderItems = form.orderItems.filter(item =>
+      item.size.trim() !== "" ||
+      item.qnty !== "" ||
+      item.price !== "" ||
+      item.fileName.trim() !== ""
+    );
+
+    // If no valid items, show error
+    if (nonEmptyOrderItems.length === 0) {
+      alert("لطفا حداقل یک مورد سفارش را پر کنید");
+      return;
+    }
+
     const payload = {
       ...form,
-      // If adding new customer, remove customer and use newCustomerName
+      orderItems: nonEmptyOrderItems, // Send only non-empty items
       customer: addingCustomer ? undefined : form.customer,
     };
 
     try {
-      console.log(payload);
-      
-      await axios.post(`${BASE_URL}/order-items`, payload);
+      console.log("Submitting payload:", payload);
+
+      await axios.post(`${BASE_URL}/orderItems`, payload);
       alert("سفارش موفقانه ثبت شد");
+
+      // Reset form but keep 5 empty items
       setForm({
         customer: "",
         newCustomerName: "",
-        orderItems: [{ size: "", qnty: "", price: "", money: "", fileName: "" }],
+        orderItems: createEmptyOrderItems(5),
       });
       setAddingCustomer(false);
     } catch (err) {
@@ -113,60 +142,65 @@ const Orders = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow p-6 space-y-6">
-        <h2 className="text-xl font-bold text-cyan-800 mb-6">ثبت سفارش جدید</h2>
+      <div className=" mx-auto bg-white rounded-xl shadow p-6 space-y-6">
+        <div className="felx"> <h2 className="text-xl font-bold text-cyan-800 mb-6">ثبت سفارش جدید</h2>
 
-        {/* Customer Select / Add */}
-        <div className="flex flex-col gap-2">
-          <label className="block mb-1 text-sm font-medium">مشتری</label>
+          {/* Customer Select / Add */}
+          <div className="flex flex-col gap-2">
+            <label className="block mb-1 text-sm font-medium">مشتری</label>
 
-          {addingCustomer ? (
-            <div className="flex gap-2 items-center">
-              <input
-                type="text"
-                value={form.newCustomerName}
-                onChange={handleNewCustomerChange}
-                placeholder="نام مشتری جدید"
-                className="w-full border rounded-md px-3 py-2"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setAddingCustomer(false)}
-                className="text-white bg-red-500 px-3 py-2 rounded-md"
-              >
-                لغو
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-2 items-center">
-              <select
-                name="customer"
-                value={form.customer}
-                onChange={handleCustomerChange}
-                className="w-full border rounded-md px-3 py-2"
-              >
-                <option value="">انتخاب مشتری</option>
-                {Array.isArray(customers) &&
-                  customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.fullname} ({c.phoneNumber})
-                    </option>
-                  ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setAddingCustomer(true)}
-                className="flex items-center gap-1 bg-cyan-800 text-white px-3 py-2 rounded-md"
-              >
-                <FaPlus />
-              </button>
-            </div>
-          )}
-        </div>
+            {addingCustomer ? (
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={form.newCustomerName}
+                  onChange={handleNewCustomerChange}
+                  placeholder="نام مشتری جدید"
+                  className="w-full border rounded-md px-3 py-2"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setAddingCustomer(false)}
+                  className="text-white bg-red-500 px-3 py-2 rounded-md"
+                >
+                  لغو
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2 items-center">
+                <select
+                  name="customer"
+                  value={form.customer}
+                  onChange={handleCustomerChange}
+                  className="w-full border rounded-md px-3 py-2"
+                >
+                  <option value="">انتخاب مشتری</option>
+                  {Array.isArray(customers) &&
+                    customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.fullname} ({c.phoneNumber})
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setAddingCustomer(true)}
+                  className="flex items-center gap-1 bg-cyan-800 text-white px-3 py-2 rounded-md"
+                >
+                  <FaPlus />
+                </button>
+              </div>
+            )}
+          </div></div>
 
-        {/* Order Items */}
+        {/* Order Items - Show all 5 initially */}
         <div className="space-y-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-medium text-gray-700">موارد سفارش ({form.orderItems.length} مورد)</h3>
+            <span className="text-sm text-gray-500">5 مورد خالی برای شروع</span>
+          </div>
+
           {form.orderItems.map((item, index) => (
             <OrderItemForm
               key={index}
@@ -174,7 +208,7 @@ const Orders = () => {
               index={index}
               handleItemChange={handleItemChange}
               deleteOrderItem={deleteOrderItem}
-              canDelete={form.orderItems.length > 1}
+              canDelete={form.orderItems.length > 5} // Can only delete if more than 5 items
             />
           ))}
 
@@ -184,7 +218,7 @@ const Orders = () => {
             className="flex items-center gap-2 bg-cyan-800 text-white px-4 py-2 rounded-lg font-semibold hover:bg-cyan-900 transition"
           >
             <FaPlus />
-            افزودن مورد جدید
+            افزودن مورد جدید (مجموع: {form.orderItems.length})
           </button>
         </div>
 
@@ -193,9 +227,10 @@ const Orders = () => {
           onClick={handleSubmit}
           className="w-full bg-cyan-800 text-white py-3 rounded-md hover:bg-cyan-900 transition"
         >
-          ثبت سفارش
+          ثبت سفارش ({form.orderItems.filter(item => item.size || item.qnty || item.price || item.fileName).length} مورد پر شده)
         </button>
-      </div>
+      </div><OrderItemsList
+      />
     </div>
   );
 };

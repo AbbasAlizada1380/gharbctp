@@ -7,8 +7,8 @@ const Stock = () => {
   const [activeTab, setActiveTab] = useState("incoming");
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg p-6 space-y-6">
+    <div className=" bg-gray-100 p-6">
+      <div className=" mx-auto bg-white rounded-xl shadow-lg p-6 space-y-6">
         <h2 className="text-2xl font-bold text-cyan-800 mb-6">مدیریت موجودی</h2>
 
         {/* Navbar / Tabs */}

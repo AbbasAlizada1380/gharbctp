@@ -22,25 +22,25 @@ const ExistingStock = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
         limit: "10"
       });
-      
+
       if (search) {
         params.append("size", search);
       }
 
       const response = await fetch(`${EXIST_API_URL}?${params.toString()}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
-      
+
       // Handle both response formats
       if (result.data) {
         // New format: { success: true, count: 1, data: [...] }
@@ -65,7 +65,7 @@ const ExistingStock = () => {
           lowStockCount: 0
         });
       }
-      
+
       setCurrentPage(page);
     } catch (error) {
       console.error("Error fetching existing stock:", error);
@@ -94,21 +94,10 @@ const ExistingStock = () => {
     }
   };
 
-  // Reset search
-  const handleResetSearch = () => {
-    setSearchTerm("");
-    fetchStock(1, "");
-  };
-
-  // Format number with Persian locale
-  const formatNumber = (number) => {
-    return new Intl.NumberFormat('fa-IR').format(number);
-  };
-
   // Get size label if available
   const getSizeLabel = (size) => {
     if (!sizes || !Array.isArray(sizes)) return size;
-    
+
     const sizeObj = sizes.find(s => s.value === size || s.label === size);
     return sizeObj ? sizeObj.label : size;
   };
@@ -149,7 +138,7 @@ const ExistingStock = () => {
     <div className="p-6 bg-white rounded-xl shadow-md">
       <h2 className="text-2xl font-bold text-cyan-800 mb-6">موجودی فعلی انبار</h2>
 
-      
+
 
       {stockItems.length === 0 ? (
         <div className="text-center py-8">
@@ -164,14 +153,15 @@ const ExistingStock = () => {
         <>
           {/* Stock Table */}
           <div className="overflow-x-auto mb-6">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="p-3 text-right border border-gray-200">ردیف</th>
-                  <th className="p-3 text-right border border-gray-200">اندازه</th>
-                  <th className="p-3 text-right border border-gray-200">تعداد</th>
-                  <th className="p-3 text-right border border-gray-200">وضعیت</th>
-                  <th className="p-3 text-right border border-gray-200">آخرین به‌روزرسانی</th>
+            <table className="w-full text-center">
+              <thead className="bg-cyan-50 text-cyan-800">
+                <tr>
+                  <th className="p-3 border-b font-semibold">#</th>
+                  <th className="p-3 border-b font-semibold">اندازه</th>
+                  <th className="p-3 border-b font-semibold">تعداد (کارتن)</th>
+                  <th className="p-3 border-b font-semibold">تعداد (پلیت)</th>
+                  <th className="p-3 border-b font-semibold">وضعیت</th>
+                  <th className="p-3 border-b font-semibold">آخرین به‌روزرسانی</th>
                 </tr>
               </thead>
               <tbody>
@@ -180,33 +170,69 @@ const ExistingStock = () => {
                   const quantity = parseFloat(item.quantity || 0);
                   const statusClass = getStockStatus(item.quantity);
                   const statusText = getStockStatusText(item.quantity);
-                  
+                  const platesCount = quantity * 50;
+
                   return (
-                    <tr 
-                      key={item.id || index} 
-                      className="hover:bg-gray-50 transition"
+                    <tr
+                      key={item.id || index}
+                      className="hover:bg-gray-50 border-b last:border-0 transition-colors"
                     >
-                      <td className="p-3 border border-gray-200 text-center">
-                        {formatNumber(rowNumber)}
+                      <td className="p-3 text-gray-600">
+                        {rowNumber}
                       </td>
-                      <td className="p-3 border border-gray-200 font-medium">
-                        {getSizeLabel(item.size)}
+                      <td className="p-3">
+                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm font-medium">
+                          {getSizeLabel(item.size)}
+                        </span>
                       </td>
-                      <td className="p-3 border border-gray-200 font-bold">
-                        {formatNumber(quantity)}
+                      <td className="p-3">
+                        <span className={`px-2 py-1 rounded-full text-sm font-bold ${quantity > 50
+                            ? 'bg-green-100 text-green-800'
+                            : quantity > 10
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                          {quantity.toLocaleString('en-US')}
+                        </span>
                       </td>
-                      <td className="p-3 border border-gray-200">
+                      <td className="p-3">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-bold">
+                          {platesCount.toLocaleString('en-US')}
+                        </span>
+                      </td>
+                      <td className="p-3">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass}`}>
                           {statusText}
                         </span>
                       </td>
-                      <td className="p-3 border border-gray-200 text-sm text-gray-600">
-                        {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('fa-IR') : '-'}
+                      <td className="p-3 text-gray-500 text-sm">
+                        {item.updatedAt ?
+                          new Date(item.updatedAt)
+                            .toLocaleDateString('fa-IR')
+                            .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+                          : '—'
+                        }
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
+              {stockItems.length > 0 && (
+                <tfoot className="bg-gray-50">
+                  <tr>
+                    <td colSpan="2" className="p-3 text-right font-semibold text-gray-700">
+                      مجموع کل:
+                    </td>
+                    <td className="p-3 font-bold text-green-700">
+                      {stockItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0).toLocaleString('en-US')}
+                    </td>
+                    <td className="p-3 font-bold text-blue-700">
+                      {stockItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0) * 50, 0).toLocaleString('en-US')}
+                    </td>
+                    <td colSpan="2"></td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
 
@@ -220,7 +246,7 @@ const ExistingStock = () => {
               >
                 قبلی
               </button>
-              
+
               <div className="flex gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
@@ -233,23 +259,22 @@ const ExistingStock = () => {
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
-                  
+
                   return (
                     <button
                       key={pageNum}
                       onClick={() => handlePageChange(pageNum)}
-                      className={`px-4 py-2 rounded-md transition ${
-                        currentPage === pageNum
-                          ? 'bg-cyan-600 text-white'
-                          : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
+                      className={`px-4 py-2 rounded-md transition ${currentPage === pageNum
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-gray-100 hover:bg-gray-200'
+                        }`}
                     >
-                      {formatNumber(pageNum)}
+                      {(pageNum)}
                     </button>
                   );
                 })}
               </div>
-              
+
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
@@ -257,9 +282,9 @@ const ExistingStock = () => {
               >
                 بعدی
               </button>
-              
+
               <span className="text-sm text-gray-600 mr-2">
-                صفحه {formatNumber(currentPage)} از {formatNumber(totalPages)}
+                صفحه {(currentPage)} از {(totalPages)}
               </span>
             </div>
           )}

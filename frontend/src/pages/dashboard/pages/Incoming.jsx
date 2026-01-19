@@ -2,24 +2,29 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import sizes from "../services/Size.js";
 
-
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const INCOME_API_URL = `${BASE_URL}/stock/income`;
 
+// Function to create empty items
+const createEmptyItems = (count = 5) => {
+  return Array.from({ length: count }, () => ({
+    size: "",
+    quantity: "",
+    price: "",
+    money: "",
+    spent: "0"
+  }));
+};
+
 const Incoming = () => {
-  const [items, setItems] = useState([{ size: "", quantity: "", price: "", money: "" }]);
+  const [items, setItems] = useState(createEmptyItems(5)); // Start with 5 empty items
   const [incomes, setIncomes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [summary, setSummary] = useState({
-    totalMoney: 0,
-    totalSpent: 0,
-    totalProfit: 0
-  });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Fetch all incomes
   const fetchIncomes = async (page = 1) => {
@@ -29,7 +34,6 @@ const Incoming = () => {
       setIncomes(response.data.incomes);
       setTotalPages(response.data.pagination.totalPages);
       setTotalItems(response.data.pagination.totalItems);
-      setSummary(response.data.summary || {});
       setCurrentPage(page);
     } catch (error) {
       console.error("Error fetching incomes:", error);
@@ -46,7 +50,7 @@ const Incoming = () => {
       const response = await axios.get(`${INCOME_API_URL}/${id}`);
       const income = response.data;
 
-      // Set form for editing
+      // Set form for editing - replace all items with the editing item
       setItems([{
         size: income.size || "",
         quantity: income.quantity || "",
@@ -55,6 +59,7 @@ const Incoming = () => {
         spent: income.spent || "0"
       }]);
       setEditingId(id);
+      setHasUnsavedChanges(false);
 
       // Scroll to form
       document.getElementById('income-form').scrollIntoView({ behavior: 'smooth' });
@@ -70,9 +75,6 @@ const Incoming = () => {
   const createIncome = async (incomeData) => {
     try {
       const response = await axios.post(INCOME_API_URL, incomeData);
-      alert("درآمد با موفقیت ثبت شد");
-      fetchIncomes(currentPage);
-      resetForm();
       return response.data;
     } catch (error) {
       console.error("Error creating income:", error.response?.data || error.message);
@@ -85,27 +87,11 @@ const Incoming = () => {
   const updateIncome = async (id, incomeData) => {
     try {
       const response = await axios.put(`${INCOME_API_URL}/${id}`, incomeData);
-      alert("درآمد با موفقیت بروزرسانی شد");
-      fetchIncomes(currentPage);
-      resetForm();
       return response.data;
     } catch (error) {
       console.error("Error updating income:", error.response?.data || error.message);
       alert(error.response?.data?.message || "خطا در بروزرسانی درآمد");
       throw error;
-    }
-  };
-
-  // Partial update income
-  const partialUpdateIncome = async (id, incomeData) => {
-    try {
-      const response = await axios.patch(`${INCOME_API_URL}/${id}`, incomeData);
-      alert("درآمد با موفقیت بروزرسانی شد");
-      fetchIncomes(currentPage);
-      return response.data;
-    } catch (error) {
-      console.error("Error partially updating income:", error);
-      alert("خطا در بروزرسانی جزئی درآمد");
     }
   };
 
@@ -122,21 +108,6 @@ const Incoming = () => {
     } catch (error) {
       console.error("Error deleting income:", error);
       alert("خطا در حذف درآمد");
-    }
-  };
-
-  // Search incomes
-  const searchIncomes = async () => {
-    try {
-      setLoading(true);
-      // Note: You might need to implement search endpoint in your backend
-      const response = await axios.get(`${INCOME_API_URL}?search=${searchTerm}`);
-      setIncomes(response.data.incomes);
-    } catch (error) {
-      console.error("Error searching incomes:", error);
-      alert("خطا در جستجوی درآمدها");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -165,32 +136,58 @@ const Incoming = () => {
     }
 
     setItems(updatedItems);
+    setHasUnsavedChanges(true);
   };
 
   // Add new empty row
   const addItem = () => {
     setItems([...items, { size: "", quantity: "", price: "", money: "", spent: "0" }]);
+    setHasUnsavedChanges(true);
   };
 
-  // Remove row from form
+  // Remove row from form - don't allow removal if we have only 5 items (initial state)
   const removeItem = (index) => {
+    if (items.length <= 5) {
+      alert("حداقل باید ۵ مورد موجود باشد");
+      return;
+    }
+
     const updatedItems = items.filter((_, i) => i !== index);
     setItems(updatedItems);
+    setHasUnsavedChanges(true);
   };
 
-  // Reset form
+  // Reset form to initial 5 empty items
   const resetForm = () => {
-    setItems([{ size: "", quantity: "", price: "", money: "", spent: "0" }]);
+    if (hasUnsavedChanges && !window.confirm("آیا از لغو تغییرات اطمینان دارید؟ تغییرات ذخیره نشده از بین خواهند رفت.")) {
+      return;
+    }
+
+    setItems(createEmptyItems(5));
     setEditingId(null);
+    setHasUnsavedChanges(false);
   };
 
-  // Handle form submission
+  // Handle form submission with smart filtering
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate form
+    // Filter out completely empty items
+    const nonEmptyItems = items.filter(item =>
+      item.size.trim() !== "" ||
+      item.quantity !== "" ||
+      item.price !== ""
+    );
+
+    // If no valid items, show error
+    if (nonEmptyItems.length === 0) {
+      alert("لطفا حداقل یک مورد را پر کنید");
+      return;
+    }
+
+    // Validate filled items
     const validationErrors = [];
-    items.forEach((item, index) => {
+    nonEmptyItems.forEach((item, index) => {
       if (!item.size) validationErrors.push(`سطر ${index + 1}: اندازه را انتخاب کنید`);
       if (!item.quantity || parseFloat(item.quantity) <= 0) validationErrors.push(`سطر ${index + 1}: تعداد معتبر وارد کنید`);
       if (!item.price || parseFloat(item.price) <= 0) validationErrors.push(`سطر ${index + 1}: قیمت معتبر وارد کنید`);
@@ -206,19 +203,32 @@ const Incoming = () => {
     try {
       // If editing, update existing income
       if (editingId) {
-        await updateIncome(editingId, items[0]);
+        await updateIncome(editingId, nonEmptyItems[0]);
+        alert("درآمد با موفقیت بروزرسانی شد");
       }
-      // If creating, create each item as separate income
+      // If creating, create each non-empty item as separate income
       else {
-        for (const item of items) {
+        let successCount = 0;
+        for (const item of nonEmptyItems) {
           await createIncome({
             size: item.size,
             quantity: item.quantity,
             price: item.price,
             spent: item.spent || "0"
           });
+          successCount++;
         }
+        alert(`${successCount} مورد با موفقیت ثبت شد`);
       }
+
+      // Reset form but keep 5 empty items
+      setItems(createEmptyItems(5));
+      setEditingId(null);
+      setHasUnsavedChanges(false);
+      fetchIncomes(currentPage);
+    } catch (error) {
+      console.error("Error:", error);
+      // Error is already shown by createIncome/updateIncome functions
     } finally {
       setLoading(false);
     }
@@ -230,140 +240,158 @@ const Incoming = () => {
   }, []);
 
   // Format date
-const formatDate = (dateString) => {
-  return new Intl.DateTimeFormat("fa-IR-u-ca-persian-nu-latn", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(dateString));
-};
+  const formatDate = (dateString) => {
+    return new Intl.DateTimeFormat("fa-IR-u-ca-persian-nu-latn", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(dateString));
+  };
 
+  // Count filled items
+  const filledItemsCount = items.filter(item =>
+    item.size.trim() !== "" ||
+    item.quantity !== "" ||
+    item.price !== ""
+  ).length;
 
   return (
     <div className="p-6">
       <h2 className="text-2xl font-bold text-cyan-800 mb-6">مدیریت واردات</h2>
 
-
       {/* Form Section */}
       <div id="income-form" className="mb-8 bg-white p-6 rounded-xl shadow-md">
-        <h3 className="text-lg font-bold text-cyan-800 mb-4">
-          {editingId ? "ویرایش درآمد" : "ثبت درآمد جدید"}
-        </h3>
+
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {items.map((item, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end border-b border-gray-200 pb-4 mb-4"
-            >
-              {/* Size */}
-              <div className="md:col-span-2">
-                <label className="block mb-1 text-sm font-medium">اندازه</label>
-                <select
-                  name="size"
-                  value={item.size}
-                  onChange={(e) => handleChange(index, e)}
-                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-cyan-300"
-                  required
-                >
-                  <option value="">انتخاب اندازه</option>
-                  {sizes.map((s) => (
-                    <option key={s.id} value={s.label}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          {items.map((item, index) => {
+            // Check if item is empty
+            const isEmpty = !item.size && !item.quantity && !item.price;
 
-              {/* Quantity */}
-              <div>
-                <label className="block mb-1 text-sm font-medium">تعداد</label>
-                <input
-                  type="number"
-                  name="quantity"
-                  value={item.quantity}
-                  onChange={(e) => handleChange(index, e)}
-                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-cyan-300"
-                  placeholder="تعداد"
-                  min="0"
-                  step="0.001"
-                  required
-                />
-              </div>
+            return (
+              <div
+                key={index}
+                className={`grid grid-cols-1 md:grid-cols-6 gap-4 items-end border-b border-gray-200 pb-4 mb-4 ${isEmpty ? 'bg-gray-50 p-4 rounded-md border-dashed' : ''}`}
+              >
 
-              {/* Price */}
-              <div>
-                <label className="block mb-1 text-sm font-medium">قیمت</label>
-                <input
-                  type="number"
-                  name="price"
-                  value={item.price}
-                  onChange={(e) => handleChange(index, e)}
-                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-cyan-300"
-                  placeholder="قیمت واحد"
-                  min="0"
-                  step="0.001"
-                  required
-                />
-              </div>
-
-            
-
-              {/* Money (Auto-calculated) */}
-              <div>
-                <label className="block mb-1 text-sm font-medium">مبلغ کل</label>
-                <input
-                  type="text"
-                  name="money"
-                  value={item.money}
-                  readOnly
-                  className="w-full border border-gray-300 bg-gray-50 rounded-md p-2"
-                  placeholder="محاسبه خودکار"
-                />
-              </div>
-
-              {/* Remove Button (only show if multiple items and not editing) */}
-              {items.length > 1 && !editingId && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(index)}
-                    className="w-full px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition"
+                {/* Size */}
+                <div className="md:col-span-2">
+                  <label className="block mb-1 text-sm font-medium">اندازه</label>
+                  <select
+                    name="size"
+                    value={item.size}
+                    onChange={(e) => handleChange(index, e)}
+                    className={`w-full border rounded-md p-2 focus:ring-2 focus:ring-cyan-300 ${isEmpty ? 'border-dashed' : ''}`}
                   >
-                    حذف
-                  </button>
+                    <option value="">انتخاب اندازه</option>
+                    {sizes.map((s) => (
+                      <option key={s.id} value={s.label}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Quantity */}
+                <div>
+                  <label className="block mb-1 text-sm font-medium">تعداد</label>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={item.quantity}
+                    onChange={(e) => handleChange(index, e)}
+                    className={`w-full border rounded-md p-2 focus:ring-2 focus:ring-cyan-300 ${isEmpty ? 'border-dashed' : ''}`}
+                    placeholder="0"
+                    min="0"
+                    step="0.001"
+                  />
+                </div>
+
+                {/* Price */}
+                <div>
+                  <label className="block mb-1 text-sm font-medium">قیمت</label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={item.price}
+                    onChange={(e) => handleChange(index, e)}
+                    className={`w-full border rounded-md p-2 focus:ring-2 focus:ring-cyan-300 ${isEmpty ? 'border-dashed' : ''}`}
+                    placeholder="0"
+                    min="0"
+                    step="0.001"
+                  />
+                </div>
+
+                {/* Money (Auto-calculated) */}
+                <div>
+                  <label className="block mb-1 text-sm font-medium">مبلغ کل</label>
+                  <input
+                    type="text"
+                    name="money"
+                    value={item.money}
+                    readOnly
+                    className="w-full border border-gray-300 bg-gray-50 rounded-md p-2"
+                    placeholder="محاسبه خودکار"
+                  />
+                </div>
+
+                {/* Remove Button (only show if multiple items and not editing) */}
+                {items.length > 5 && !editingId && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="w-full px-3 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition"
+                      title="حذف این مورد"
+                    >
+                      حذف
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-200">
             {!editingId && (
-              <button
-                type="button"
-                onClick={addItem}
-                className="flex items-center gap-2 bg-cyan-600 text-white px-4 py-2 rounded-md hover:bg-cyan-700 transition"
-              >
-                + مورد جدید
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="flex items-center gap-2 bg-cyan-600 text-white px-4 py-2 rounded-md hover:bg-cyan-700 transition"
+                >
+                  + مورد جدید (مجموع: {items.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setItems(createEmptyItems(5))}
+                  className="flex items-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition"
+                  disabled={items.length === 5 && !hasUnsavedChanges}
+                >
+                  بازنشانی به ۵ مورد خالی
+                </button>
+              </>
             )}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || filledItemsCount === 0}
               className="flex-1 bg-cyan-800 text-white py-3 rounded-md hover:bg-cyan-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "در حال پردازش..." : editingId ? "بروزرسانی درآمد" : "ثبت درآمد"}
+              {loading ? "در حال پردازش..." :
+                editingId ? "بروزرسانی درآمد" :
+                  `ثبت ${filledItemsCount} مورد درآمد`}
             </button>
 
-            {editingId && (
+            {(editingId || hasUnsavedChanges) && (
               <button
                 type="button"
                 onClick={resetForm}
                 className="bg-gray-400 text-white px-4 py-3 rounded-md hover:bg-gray-500 transition"
               >
-                انصراف
+                {editingId ? "انصراف ویرایش" : "لغو تغییرات"}
               </button>
             )}
           </div>
@@ -372,8 +400,11 @@ const formatDate = (dateString) => {
 
       {/* Incomes List */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
           <h3 className="text-lg font-bold text-cyan-800">لیست درآمدها ({totalItems} مورد)</h3>
+          <span className="text-sm text-gray-600">
+            صفحه {currentPage} از {totalPages}
+          </span>
         </div>
 
         {loading ? (
@@ -387,52 +418,122 @@ const formatDate = (dateString) => {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
+              <table className="w-full text-center">
+                <thead className="bg-cyan-50 text-cyan-800">
                   <tr>
-                    <th className="p-3 text-right border">ردیف</th>
-                    <th className="p-3 text-right border">اندازه</th>
-                    <th className="p-3 text-right border">تعداد</th>
-                    <th className="p-3 text-right border">قیمت واحد</th>
-                    <th className="p-3 text-right border">مبلغ کل</th>
-                    <th className="p-3 text-right border">مصرف شده</th>
-                    <th className="p-3 text-right border">تاریخ</th>
-                    <th className="p-3 text-right border">عملیات</th>
+                    <th className="p-3 border-b font-semibold">#</th>
+                    <th className="p-3 border-b font-semibold">اندازه</th>
+                    <th className="p-3 border-b font-semibold">تعداد (کارتن)</th>
+                    <th className="p-3 border-b font-semibold">قیمت کارتن (افغانی)</th>
+                    <th className="p-3 border-b font-semibold">مبلغ کل (افغانی)</th>
+                    <th className="p-3 border-b font-semibold">مصرف شده</th>
+                    <th className="p-3 border-b font-semibold">موجودی</th>
+                    <th className="p-3 border-b font-semibold">تاریخ</th>
+                    <th className="p-3 border-b font-semibold">عملیات</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {incomes.map((income, index) => (
-                    <tr key={income.id} className="hover:bg-gray-50">
-                      <td className="p-3 border">{(currentPage - 1) * 10 + index + 1}</td>
-                      <td className="p-3 border">{income.size}</td>
-                      <td className="p-3 border">{income.quantity}</td>
-                      <td className="p-3 border">{income.price}</td>
-                      <td className="p-3 border font-semibold text-green-700">
-                        {income.money}
-                      </td>
-                      <td className="p-3 border text-red-600">
-                        {income.spent || 0}
-                      </td>
-                      <td className="p-3 border">{formatDate(income.createdAt)}</td>
-                      <td className="p-3 border">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => fetchIncomeById(income.id)}
-                            className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600"
-                          >
-                            ویرایش
-                          </button>
-                          <button
-                            onClick={() => deleteIncome(income.id)}
-                            className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
-                          >
-                            حذف
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {incomes.map((income, index) => {
+                    const remaining = parseFloat(income.quantity || 0) - parseFloat(income.spent || 0);
+                    return (
+                      <tr
+                        key={income.id}
+                        className="hover:bg-gray-50 border-b last:border-0 transition-colors"
+                      >
+                        <td className="p-3 text-gray-600">
+                          {(currentPage - 1) * 10 + index + 1}
+                        </td>
+                        <td className="p-3">
+                          <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
+                            {income.size}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
+                            {income.quantity}
+                          </span>
+                        </td>
+                        <td className="p-3 text-green-700 font-semibold">
+                          {parseFloat(income.price || 0).toLocaleString('en-US')}
+                        </td>
+                        <td className="p-3 text-purple-700 font-bold">
+                          {parseFloat(income.money || 0).toLocaleString('en-US')}
+                        </td>
+                        <td className="p-3">
+                          <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-sm">
+                            {income.spent || 0}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-sm font-medium ${remaining > 0
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-gray-100 text-gray-500'
+                            }`}>
+                            {remaining > 0 ? remaining : 0}
+                          </span>
+                        </td>
+                        <td className="p-3 text-gray-500 text-sm">
+                          {income.createdAt ?
+                            new Date(income.createdAt)
+                              .toLocaleDateString('fa-IR')
+                              .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+                            : '—'
+                          }
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => fetchIncomeById(income.id)}
+                              className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg"
+                              title="ویرایش"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => deleteIncome(income.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              title="حذف"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
+                {incomes.length > 0 && (
+                  <tfoot className="bg-gray-50">
+                    <tr>
+                      <td colSpan="2" className="p-3 text-right font-semibold text-gray-700">
+                        مجموع کل:
+                      </td>
+                      <td className="p-3 font-bold text-blue-700">
+                        {incomes.reduce((sum, income) => sum + (parseFloat(income.quantity) || 0), 0)}
+                      </td>
+                      <td className="p-3 font-bold text-green-700">
+                        {incomes.reduce((sum, income) => sum + (parseFloat(income.price) || 0), 0)}
+                      </td>
+                      <td className="p-3 font-bold text-purple-700">
+                        {incomes.reduce((sum, income) => sum + (parseFloat(income.money) || 0), 0)}
+                      </td>
+                      <td className="p-3 font-bold text-red-700">
+                        {incomes.reduce((sum, income) => sum + (parseFloat(income.spent) || 0), 0)}
+                      </td>
+                      <td className="p-3 font-bold text-blue-700">
+                        {incomes.reduce((sum, income) => {
+                          const remaining = parseFloat(income.quantity || 0) - parseFloat(income.spent || 0);
+                          return sum + (remaining > 0 ? remaining : 0);
+                        }, 0)}
+                      </td>
+                      <td colSpan="2"></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
 
@@ -442,25 +543,38 @@ const formatDate = (dateString) => {
                 <button
                   onClick={() => fetchIncomes(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+                  className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
                 >
                   قبلی
                 </button>
 
-                {[...Array(totalPages)].map((_, i) => (
-                  <button
-                    key={i + 1}
-                    onClick={() => fetchIncomes(i + 1)}
-                    className={`px-4 py-2 rounded ${currentPage === i + 1 ? 'bg-cyan-600 text-white' : 'bg-gray-100'}`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
+                {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => fetchIncomes(pageNum)}
+                      className={`px-4 py-2 rounded transition ${currentPage === pageNum ? 'bg-cyan-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
 
                 <button
                   onClick={() => fetchIncomes(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+                  className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
                 >
                   بعدی
                 </button>
