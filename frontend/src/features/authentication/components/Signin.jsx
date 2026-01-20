@@ -47,7 +47,7 @@ const Signin = () => {
                 <div className="absolute -inset-1 bg-cyan-400 rounded-full blur opacity-30 animate-ping"></div>
               </div>
               <h1 className="text-3xl font-bold text-cyan-800 drop-shadow-sm">
-                چاپخانه اکبر
+             غرب سی تی پی
               </h1>
             </div>
             <p className="text-gray-600 mt-2">لطفاً اطلاعات خود را وارد کنید</p>
@@ -184,10 +184,10 @@ const Signin = () => {
           {/* Footer */}
           <div className="text-center pt-4 border-t border-gray-100">
             <p className="text-gray-600 text-sm">
-              چاپخانه اکبر - خدمات چاپ با کیفیت
+                غرب سی تی پی - خدمات  با کیفیت
             </p>
             <p className="text-gray-500 text-xs mt-1">
-              Akbar Printing House - Quality Printing Services
+             Gharb ctp- high Quality  Services
             </p>
           </div>
         </form>
