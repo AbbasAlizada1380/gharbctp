@@ -8,13 +8,14 @@ import Customers from "./pages/Customers";
 import Stock from "./pages/Stock";
 import ExpenseManager from "./pages/expense/ExpenseManages";
 import StaffManager from "./pages/StaffManager";
+import SalaryManagement from "./pages/SalaryManagement";
 const MainContent = ({ activeComponent }) => {
   const renderContent = () => {
     switch (activeComponent) {
       case "dashboard":
         return <Dashboard />;
-      case "ActiveAthletes":
-        return <ActiveAthletes />;
+      case "SalaryManagement":
+        return <SalaryManagement />;
       case "Customers":
         return <Customers />;
       case "user managements":

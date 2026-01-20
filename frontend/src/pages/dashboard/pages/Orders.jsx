@@ -196,11 +196,6 @@ const Orders = () => {
 
         {/* Order Items - Show all 5 initially */}
         <div className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-medium text-gray-700">موارد سفارش ({form.orderItems.length} مورد)</h3>
-            <span className="text-sm text-gray-500">5 مورد خالی برای شروع</span>
-          </div>
-
           {form.orderItems.map((item, index) => (
             <OrderItemForm
               key={index}
