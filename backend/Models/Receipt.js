@@ -6,7 +6,7 @@ const Receipt = sequelize.define(
   "receipt",
   {
     customer: {
-      type: DataTypes.STRING,
+      type: DataTypes.INTEGER,
       allowNull: false,
       references: {
         model: Customer,

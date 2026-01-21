@@ -6,6 +6,7 @@ const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const initialForm = {
   staffId: "",
+  receipt: 0,
   attendance: {
     Saturday: { attendance: false, overtime: 0 },
     Sunday: { attendance: false, overtime: 0 },
@@ -53,34 +54,41 @@ const SalaryManagement = () => {
   };
 
   // ---------------- CREATE / UPDATE ----------------
-  const handleSubmit = async e => {
-    e.preventDefault();
-
-    try {
-      if (editingId) {
-        await axios.put(`${BASE_URL}/attendance/${editingId}`, {
-          attendance: form.attendance,
-        });
-      } else {
-        await axios.post(`${BASE_URL}/attendance`, form);
-      }
-
-      setForm(initialForm);
-      setEditingId(null);
-      fetchAttendance();
-    } catch (error) {
-      console.error("Error saving attendance:", error);
+const handleSubmit = async e => {
+  e.preventDefault();
+  try {
+    if (editingId) {
+      await axios.put(`${BASE_URL}/attendance/${editingId}`, {
+        attendance: form.attendance,
+        receipt: form.receipt,
+      });
+    } else {
+      await axios.post(`${BASE_URL}/attendance`, form);
     }
-  };
+
+    // Refresh records after update/create
+    await fetchAttendance();
+
+    // Reset form
+    setForm(initialForm);
+    setEditingId(null);
+
+  } catch (error) {
+    console.error("Error saving attendance:", error);
+  }
+};
+
 
   // ---------------- EDIT ----------------
   const handleEdit = record => {
     setEditingId(record.id);
     setForm({
       staffId: record.staffId,
+      receipt: record.receipt || 0,
       attendance: record.attendance,
     });
   };
+
 
   // ---------------- DELETE ----------------
   const handleDelete = async id => {
@@ -215,31 +223,68 @@ const SalaryManagement = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 pt-4 border-t border-gray-200">
+
+              {/* Total & Receipt Section */}
               {editingId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForm(initialForm);
-                    setEditingId(null);
-                  }}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-                >
-                  لغو ویرایش
-                </button>
-              )}
-              <button
-                type="submit"
-                className="px-6 py-3 bg-gradient-to-r from-cyan-800 to-cyan-600 text-white rounded-lg hover:from-blue-900 hover:to-blue-700 transition font-medium shadow-md"
-              >
-                <div className="flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>{editingId ? "ذخیره تغییرات" : "ثبت حضور و غیاب"}</span>
+                <div className="flex flex-col md:flex-row gap-4 flex-1">
+
+                  {/* Total Display */}
+                  <div className="bg-gray-100 p-4 rounded-lg flex flex-col justify-center items-start">
+                    <label className="text-sm font-medium text-gray-700 mb-1">مجموع کل</label>
+                    <span className="text-lg font-bold text-emerald-700">
+                      {records.find(r => r.id === editingId)?.total || 0} ؋
+                    </span>
+                  </div>
+
+                  {/* Receipt Input */}
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      مبلغ پرداخت شده (Receipt)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={records.find(r => r.id === editingId)?.total || undefined}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                      value={form.receipt}
+                      onChange={e =>
+                        setForm({ ...form, receipt: Number(e.target.value) })
+                      }
+                    />
+                  </div>
                 </div>
-              </button>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm(initialForm);
+                      setEditingId(null);
+                    }}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                  >
+                    لغو ویرایش
+                  </button>
+                )}
+
+                <button
+                  type="submit"
+                  className="px-6 py-3 bg-gradient-to-r from-cyan-800 to-cyan-600 text-white rounded-lg hover:from-blue-900 hover:to-blue-700 transition font-medium shadow-md"
+                >
+                  <div className="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span>{editingId ? "ذخیره تغییرات" : "ثبت حضور و غیاب"}</span>
+                  </div>
+                </button>
+              </div>
             </div>
+
           </form>
         </div>
       </div>
@@ -277,6 +322,7 @@ const SalaryManagement = () => {
                 <th className="p-3 border-b font-semibold">حقوق اضافه‌کاری</th>
                 <th className="p-3 border-b font-semibold">حقوق پایه</th>
                 <th className="p-3 border-b font-semibold">مجموع کل</th>
+                <th className="p-3 border-b font-semibold">   پرداخت شده</th>
                 <th className="p-3 border-b font-semibold">عملیات</th>
               </tr>
             </thead>
@@ -295,8 +341,7 @@ const SalaryManagement = () => {
                   </td>
                 </tr>
               ) : (
-                records.map((record, index) => { {console.log(record);
-                }
+                records.map((record, index) => {
                   const attendanceDays = Object.values(record.attendance || {}).filter(day => day.attendance).length;
                   const totalOvertime = Object.values(record.attendance || {}).reduce((sum, day) => sum + (day.overtime || 0), 0);
 
@@ -325,11 +370,11 @@ const SalaryManagement = () => {
                       <td className="p-3">
                         <div className="flex flex-col gap-1 items-center">
                           <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">
-                            {  (record.overtime || 0)} ؋ کل
+                            {(record.overtime || 0)} ؋ کل
                           </span>
                           <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm">
                             {record.overtime && totalOvertime ?
-                               (record.overtime / totalOvertime) : 0} ؋ / ساعت
+                              (record.overtime / totalOvertime) : 0} ؋ / ساعت
                           </span>
                         </div>
                       </td>
@@ -342,6 +387,11 @@ const SalaryManagement = () => {
                       <td className="p-3">
                         <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-bold">
                           {(record.total || 0)} ؋
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-bold">
+                          {(record.receipt || 0)} ؋
                         </span>
                       </td>
                       <td className="p-3">

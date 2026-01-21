@@ -17,7 +17,6 @@ const Staff = sequelize.define(
     NIC: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
       comment: "National ID / NIC number",
     },
     salary: {

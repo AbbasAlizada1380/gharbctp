@@ -9,6 +9,7 @@ import Stock from "./pages/Stock";
 import ExpenseManager from "./pages/expense/ExpenseManages";
 import StaffManager from "./pages/StaffManager";
 import SalaryManagement from "./pages/SalaryManagement";
+import Receipt from "./pages/Receipt";
 const MainContent = ({ activeComponent }) => {
   const renderContent = () => {
     switch (activeComponent) {
@@ -32,6 +33,8 @@ const MainContent = ({ activeComponent }) => {
         return <ExpenseManager />;
       case "Orders":
         return <Orders />;
+      case "Receipt":
+        return <Receipt />;
       case "AddUser":
         return <AddUser />;
 

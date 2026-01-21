@@ -1,7 +1,7 @@
 import Attendance from "../Models/Attendence.js";
 import Staff from "../Models/staff/staff.js"
 
-const calculateAmounts = (attendance, dailySalary, overTimePerHour,workingDaysPerWeek) => {
+const calculateAmounts = (attendance, dailySalary, overTimePerHour, workingDaysPerWeek) => {
   let attendanceDays = 0;
   let overtimeHours = 0;
 
@@ -10,7 +10,7 @@ const calculateAmounts = (attendance, dailySalary, overTimePerHour,workingDaysPe
     overtimeHours += Number(day.overtime || 0);
   });
 
-  const salary = attendanceDays * (dailySalary/workingDaysPerWeek);
+  const salary = attendanceDays * (dailySalary / workingDaysPerWeek);
   const overtime = overtimeHours * overTimePerHour;
   const total = salary + overtime;
 
@@ -78,7 +78,7 @@ export const getAttendanceById = async (req, res) => {
 };
 export const updateAttendance = async (req, res) => {
   try {
-    const { attendance } = req.body;
+    const { attendance, receipt } = req.body; // <-- include receipt
 
     const record = await Attendance.findByPk(req.params.id);
     if (!record) {
@@ -94,11 +94,14 @@ export const updateAttendance = async (req, res) => {
       staff.workingDaysPerWeek
     );
 
+    // Update attendance, amounts, and receipt
     await record.update({
       attendance,
       salary,
       overtime,
       total,
+      receipt: receipt !== undefined ? receipt : record.receipt
+
     });
 
     res.json(record);
@@ -106,6 +109,8 @@ export const updateAttendance = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+
 export const deleteAttendance = async (req, res) => {
   try {
     const record = await Attendance.findByPk(req.params.id);

@@ -43,6 +43,7 @@ const Sidebar = ({ setActiveComponent }) => {
     { name: "سفارشات جدید", value: "Orders", icon: <MdAddShoppingCart /> },
     // { name: "لیست سفارشات ", value: "OrdersList", icon: <FaList /> },
     { name: "مشتری ها", value: "Customers", icon: <FaList /> },
+    { name: "رسید ها", value: "Receipt", icon: <FaList /> },
     { name: "گدام", value: "Stock", icon: <FaList /> },
     { name: "مصارف", value: "ExpenseManager", icon: <FaList /> },
     { name: "کارمندان", value: "StaffManager", icon: <FaList /> },

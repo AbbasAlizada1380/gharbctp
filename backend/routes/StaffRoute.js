@@ -5,7 +5,7 @@ import {
   getStaffById,
   updateStaff,
   deleteStaff,
-} from "../Controllers/StaffController.js";
+} from "../Controllers/staffController.js";
 
 const StaffRoute = express.Router();
 

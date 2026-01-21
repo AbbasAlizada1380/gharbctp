@@ -57,6 +57,10 @@ const Attendance = sequelize.define(
       defaultValue: 0,
       comment: "salary + overtime",
     },
+    receipt: {
+      type: DataTypes.FLOAT,
+      defaultValue: 0,
+    },
   },
   {
     tableName: "attendance",
