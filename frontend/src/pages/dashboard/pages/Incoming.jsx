@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import sizes from "../services/Size.js";
+import Pagination from "../pagination/Pagination"; // Import the Pagination component
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const INCOME_API_URL = `${BASE_URL}/stock/income`;
@@ -25,12 +26,13 @@ const Incoming = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [perPage, setPerPage] = useState(10);
 
   // Fetch all incomes
   const fetchIncomes = async (page = 1) => {
     try {
       setLoading(true);
-      const response = await axios.get(`${INCOME_API_URL}?page=${page}&limit=10`);
+      const response = await axios.get(`${INCOME_API_URL}?page=${page}&limit=${perPage}`);
       setIncomes(response.data.incomes);
       setTotalPages(response.data.pagination.totalPages);
       setTotalItems(response.data.pagination.totalItems);
@@ -41,6 +43,11 @@ const Incoming = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    fetchIncomes(page);
   };
 
   // Fetch single income for edit
@@ -261,8 +268,6 @@ const Incoming = () => {
 
       {/* Form Section */}
       <div id="income-form" className="mb-8 bg-white p-6 rounded-xl shadow-md">
-
-
         <form onSubmit={handleSubmit} className="space-y-4">
           {items.map((item, index) => {
             // Check if item is empty
@@ -273,7 +278,6 @@ const Incoming = () => {
                 key={index}
                 className={`grid grid-cols-1 md:grid-cols-6 gap-4 items-end border-b border-gray-200 pb-4 mb-4 ${isEmpty ? 'bg-gray-50 p-4 rounded-md border-dashed' : ''}`}
               >
-
                 {/* Size */}
                 <div className="md:col-span-2">
                   <label className="block mb-1 text-sm font-medium">اندازه</label>
@@ -441,7 +445,7 @@ const Incoming = () => {
                         className="hover:bg-gray-50 border-b last:border-0 transition-colors"
                       >
                         <td className="p-3 text-gray-600">
-                          {(currentPage - 1) * 10 + index + 1}
+                          {(currentPage - 1) * perPage + index + 1}
                         </td>
                         <td className="p-3">
                           <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
@@ -506,80 +510,15 @@ const Incoming = () => {
                     );
                   })}
                 </tbody>
-                {incomes.length > 0 && (
-                  <tfoot className="bg-gray-50">
-                    <tr>
-                      <td colSpan="2" className="p-3 text-right font-semibold text-gray-700">
-                        مجموع کل:
-                      </td>
-                      <td className="p-3 font-bold text-blue-700">
-                        {incomes.reduce((sum, income) => sum + (parseFloat(income.quantity) || 0), 0)}
-                      </td>
-                      <td className="p-3 font-bold text-green-700">
-                        {incomes.reduce((sum, income) => sum + (parseFloat(income.price) || 0), 0)}
-                      </td>
-                      <td className="p-3 font-bold text-purple-700">
-                        {incomes.reduce((sum, income) => sum + (parseFloat(income.money) || 0), 0)}
-                      </td>
-                      <td className="p-3 font-bold text-red-700">
-                        {incomes.reduce((sum, income) => sum + (parseFloat(income.spent) || 0), 0)}
-                      </td>
-                      <td className="p-3 font-bold text-blue-700">
-                        {incomes.reduce((sum, income) => {
-                          const remaining = parseFloat(income.quantity || 0) - parseFloat(income.spent || 0);
-                          return sum + (remaining > 0 ? remaining : 0);
-                        }, 0)}
-                      </td>
-                      <td colSpan="2"></td>
-                    </tr>
-                  </tfoot>
-                )}
               </table>
             </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="p-4 border-t border-gray-200 flex justify-center gap-2">
-                <button
-                  onClick={() => fetchIncomes(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
-                >
-                  قبلی
-                </button>
-
-                {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => fetchIncomes(pageNum)}
-                      className={`px-4 py-2 rounded transition ${currentPage === pageNum ? 'bg-cyan-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-
-                <button
-                  onClick={() => fetchIncomes(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
-                >
-                  بعدی
-                </button>
+              <div className="p-6 border-t border-gray-200">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
               </div>
-            )}
           </>
         )}
       </div>

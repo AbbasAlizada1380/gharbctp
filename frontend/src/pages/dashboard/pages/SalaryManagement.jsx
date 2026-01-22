@@ -54,30 +54,29 @@ const SalaryManagement = () => {
   };
 
   // ---------------- CREATE / UPDATE ----------------
-const handleSubmit = async e => {
-  e.preventDefault();
-  try {
-    if (editingId) {
-      await axios.put(`${BASE_URL}/attendance/${editingId}`, {
-        attendance: form.attendance,
-        receipt: form.receipt,
-      });
-    } else {
-      await axios.post(`${BASE_URL}/attendance`, form);
+  const handleSubmit = async e => {
+    e.preventDefault();
+    try {
+      if (editingId) {
+        await axios.put(`${BASE_URL}/attendance/${editingId}`, {
+          attendance: form.attendance,
+          receipt: form.receipt,
+        });
+      } else {
+        await axios.post(`${BASE_URL}/attendance`, form);
+      }
+
+      // Refresh records after update/create
+      await fetchAttendance();
+
+      // Reset form
+      setForm(initialForm);
+      setEditingId(null);
+
+    } catch (error) {
+      console.error("Error saving attendance:", error);
     }
-
-    // Refresh records after update/create
-    await fetchAttendance();
-
-    // Reset form
-    setForm(initialForm);
-    setEditingId(null);
-
-  } catch (error) {
-    console.error("Error saving attendance:", error);
-  }
-};
-
+  };
 
   // ---------------- EDIT ----------------
   const handleEdit = record => {
@@ -417,33 +416,6 @@ const handleSubmit = async e => {
                 })
               )}
             </tbody>
-
-            {/* Footer with totals */}
-            {records.length > 0 && (
-              <tfoot className="bg-gray-50">
-                <tr>
-                  <td colSpan="3" className="p-3 text-right font-semibold text-gray-700">
-                    مجموع کل:
-                  </td>
-                  <td className="p-3 font-bold text-orange-700">
-                    {(records.reduce((sum, record) => {
-                      const totalOvertime = Object.values(record.attendance || {}).reduce((s, day) => s + (day.overtime || 0), 0);
-                      return sum + totalOvertime;
-                    }, 0).toFixed(1))} ساعت
-                  </td>
-                  <td className="p-3 font-bold text-green-700">
-                    {(records.reduce((sum, record) => sum + (record.salary || 0), 0))} ؋
-                  </td>
-                  <td className="p-3 font-bold text-yellow-700">
-                    {(records.reduce((sum, record) => sum + (record.overtime || 0), 0))} ؋
-                  </td>
-                  <td className="p-3 font-bold text-emerald-700">
-                    {(records.reduce((sum, record) => sum + (record.total || 0), 0))} ؋
-                  </td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
       </div>

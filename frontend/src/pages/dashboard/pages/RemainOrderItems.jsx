@@ -117,6 +117,7 @@ const RemainOrderItems = ({ customer, onClose }) => {
                     <th className="p-3 border-b font-semibold">تعداد</th>
                     <th className="p-3 border-b font-semibold">قیمت (افغانی)</th>
                     <th className="p-3 border-b font-semibold">مبلغ (افغانی)</th>
+                    <th className="p-3 border-b font-semibold">پرداخت شده (افغانی)</th>
                     <th className="p-3 border-b font-semibold">تاریخ</th>
                   </tr>
                 </thead>
@@ -126,7 +127,7 @@ const RemainOrderItems = ({ customer, onClose }) => {
                       key={item.id}
                       className="hover:bg-gray-50 border-b last:border-0 transition-colors"
                     >
-                      <td className="p-3 text-gray-600">{index + 1}</td>
+                      <td className="p-3 text-gray-600">{item.id}</td>
                       <td className="p-3 font-medium text-gray-800">{item.fileName}</td>
                       <td className="p-3 text-gray-600">{item.size}</td>
                       <td className="p-3">
@@ -140,6 +141,9 @@ const RemainOrderItems = ({ customer, onClose }) => {
                       <td className="p-3 text-purple-700 font-bold">
                         {parseFloat(item.money || 0)}
                       </td>
+                      <td className="p-3 text-purple-700 font-bold">
+                        {parseFloat(item.receipt || 0)}
+                      </td>
                       <td className="p-3 text-gray-500 text-sm">
                         {item.createdAt ?
                           new Date(item.createdAt)
@@ -151,21 +155,6 @@ const RemainOrderItems = ({ customer, onClose }) => {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-gray-50">
-                  <tr>
-                    <td colSpan="3" className="p-3 text-right font-semibold text-gray-700">
-                      مجموع:
-                    </td>
-                    <td className="p-3 font-bold text-blue-700">{totalQuantity}</td>
-                    <td className="p-3 font-bold text-green-700">
-                      {totalPrice}
-                    </td>
-                    <td className="p-3 font-bold text-purple-700">
-                      {totalMoney}
-                    </td>
-                    <td></td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           </>

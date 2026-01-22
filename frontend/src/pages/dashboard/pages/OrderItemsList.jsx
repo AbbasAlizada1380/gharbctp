@@ -11,6 +11,7 @@ import {
   FaCheck,
   FaUndo
 } from "react-icons/fa";
+import Pagination from "../pagination/Pagination"; // Import the Pagination component
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -22,7 +23,7 @@ const OrderItemsList = ({
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [perPage, setPerPage] = useState(10);
+  const [perPage, setPerPage] = useState(20);
   const [totalItems, setTotalItems] = useState(0);
   
   // Editing state
@@ -423,82 +424,19 @@ const formatDate = (dateString) => {
               ))
             )}
           </tbody>
-          {orderItems.length > 0 && (
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td colSpan="3" className="p-3 text-right font-semibold text-gray-700">
-                  مجموع کل:
-                </td>
-                <td colSpan="2" className="p-3 text-right font-bold text-blue-700">
-                  {totals.totalQuantity.toLocaleString('en-US')}
-                </td>
-                <td className="p-3 font-bold text-purple-700">
-                  {totals.totalMoney.toLocaleString('en-US')}
-                </td>
-                <td colSpan="2"></td>
-              </tr>
-            </tfoot>
-          )}
+            
         </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="p-4 border-t border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              نمایش {(currentPage - 1) * perPage + 1} تا {Math.min(currentPage * perPage, totalItems)} از {totalItems} مورد
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1 || editingId !== null}
-                className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                قبلی
-              </button>
-              
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      disabled={editingId !== null}
-                      className={`w-10 h-10 rounded-lg ${
-                        currentPage === pageNum
-                          ? 'bg-cyan-800 text-white'
-                          : 'border border-gray-300 hover:bg-gray-100'
-                      } ${editingId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
-              
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages || editingId !== null}
-                className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                بعدی
-              </button>
-            </div>
-          </div>
+      {/* 🔹 REPLACED PAGINATION WITH THE PREPARED COMPONENT */}
+     
+        <div className="p-6 border-t border-gray-200">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
         </div>
-      )}
 
       {/* Editing Warning */}
       {editingId && (

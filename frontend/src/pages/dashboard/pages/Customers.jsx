@@ -5,7 +5,7 @@ import RemainOrderItems from "./RemainOrderItems"; // adjust path if needed
 import { FaUsers, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-const limit = 10;
+const limit = 20;
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);

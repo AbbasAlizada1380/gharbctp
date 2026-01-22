@@ -21,11 +21,12 @@ const Orders = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [addingCustomer, setAddingCustomer] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Add this state
 
   const [form, setForm] = useState({
     customer: "",
     newCustomerName: "",
-    orderItems: createEmptyOrderItems(5), // Start with 5 empty items
+    orderItems: createEmptyOrderItems(5),
   });
 
   /* ===============================
@@ -101,7 +102,7 @@ const Orders = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Filter out completely empty order items (all fields empty)
+    // Filter out completely empty order items
     const nonEmptyOrderItems = form.orderItems.filter(item =>
       item.size.trim() !== "" ||
       item.qnty !== "" ||
@@ -117,7 +118,7 @@ const Orders = () => {
 
     const payload = {
       ...form,
-      orderItems: nonEmptyOrderItems, // Send only non-empty items
+      orderItems: nonEmptyOrderItems,
       customer: addingCustomer ? undefined : form.customer,
     };
 
@@ -134,6 +135,10 @@ const Orders = () => {
         orderItems: createEmptyOrderItems(5),
       });
       setAddingCustomer(false);
+      
+      // TRIGGER REFRESH HERE - Increment the refresh trigger
+      setRefreshTrigger(prev => prev + 1);
+      
     } catch (err) {
       console.error(err);
       alert("خطا در ثبت سفارش");
@@ -142,8 +147,9 @@ const Orders = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      <div className=" mx-auto bg-white rounded-xl shadow p-6 space-y-6">
-        <div className="felx"> <h2 className="text-xl font-bold text-cyan-800 mb-6">ثبت سفارش جدید</h2>
+      <div className="mx-auto bg-white rounded-xl shadow p-6 space-y-6">
+        <div className="felx"> 
+          <h2 className="text-xl font-bold text-cyan-800 mb-6">ثبت سفارش جدید</h2>
 
           {/* Customer Select / Add */}
           <div className="flex flex-col gap-2">
@@ -192,7 +198,8 @@ const Orders = () => {
                 </button>
               </div>
             )}
-          </div></div>
+          </div>
+        </div>
 
         {/* Order Items - Show all 5 initially */}
         <div className="space-y-4">
@@ -203,7 +210,7 @@ const Orders = () => {
               index={index}
               handleItemChange={handleItemChange}
               deleteOrderItem={deleteOrderItem}
-              canDelete={form.orderItems.length > 5} // Can only delete if more than 5 items
+              canDelete={form.orderItems.length > 5}
             />
           ))}
 
@@ -224,8 +231,10 @@ const Orders = () => {
         >
           ثبت سفارش ({form.orderItems.filter(item => item.size || item.qnty || item.price || item.fileName).length} مورد پر شده)
         </button>
-      </div><OrderItemsList
-      />
+      </div>
+      
+      {/* Pass the refreshTrigger prop */}
+      <OrderItemsList refreshTrigger={refreshTrigger} />
     </div>
   );
 };

@@ -1,30 +1,41 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import sizes from "../services/Size.js";
+import Pagination from "../pagination/Pagination"; // Import the Pagination component
+
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const OUTGOING_API_URL = `${BASE_URL}/stock/outgoing`;
 
+// Function to create empty items
+const createEmptyItems = (count = 5) => {
+  return Array.from({ length: count }, () => ({
+    size: "",
+    quantity: ""
+  }));
+};
+
 const Outgoing = () => {
-  const [items, setItems] = useState([{ size: "", quantity: "" }]);
+  const [items, setItems] = useState(createEmptyItems(5)); // Start with 5 empty items
   const [outgoings, setOutgoings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [summary, setSummary] = useState({
     totalQuantity: 0,
     totalMoney: 0,
     averageSaleValue: 0
   });
   const [stockInfo, setStockInfo] = useState({});
+  const [perPage, setPerPage] = useState(10);
 
   // Fetch all outgoings
   const fetchOutgoings = async (page = 1) => {
     try {
       setLoading(true);
-      const response = await axios.get(`${OUTGOING_API_URL}?page=${page}&limit=10`);
+      const response = await axios.get(`${OUTGOING_API_URL}?page=${page}&limit=${perPage}`);
       setOutgoings(response.data.outgoings);
       setTotalPages(response.data.pagination.totalPages);
       setTotalItems(response.data.pagination.totalItems);
@@ -39,6 +50,11 @@ const Outgoing = () => {
     }
   };
 
+  // Handle page change
+  const handlePageChange = (page) => {
+    fetchOutgoings(page);
+  };
+
   // Fetch single outgoing for edit
   const fetchOutgoingById = async (id) => {
     try {
@@ -46,12 +62,13 @@ const Outgoing = () => {
       const response = await axios.get(`${OUTGOING_API_URL}/${id}`);
       const outgoing = response.data;
 
-      // Set form for editing
+      // Set form for editing - replace all items with the editing item
       setItems([{
         size: outgoing.size || "",
         quantity: outgoing.quantity || ""
       }]);
       setEditingId(id);
+      setHasUnsavedChanges(false);
 
       // Scroll to form
       document.getElementById('outgoing-form').scrollIntoView({ behavior: 'smooth' });
@@ -67,14 +84,10 @@ const Outgoing = () => {
   const createOutgoing = async (outgoingData) => {
     try {
       const response = await axios.post(OUTGOING_API_URL, outgoingData);
-      alert("خروجی با موفقیت ثبت شد");
-      fetchOutgoings(currentPage);
-      resetForm();
       return response.data;
     } catch (error) {
       console.error("Error creating outgoing:", error.response?.data || error.message);
-      const errorMsg = error.response?.data?.message || "خطا در ثبت خروجی";
-      alert(errorMsg);
+      alert(error.response?.data?.message || "خطا در ثبت خروجی");
       throw error;
     }
   };
@@ -83,27 +96,11 @@ const Outgoing = () => {
   const updateOutgoing = async (id, outgoingData) => {
     try {
       const response = await axios.put(`${OUTGOING_API_URL}/${id}`, outgoingData);
-      alert("خروجی با موفقیت بروزرسانی شد");
-      fetchOutgoings(currentPage);
-      resetForm();
       return response.data;
     } catch (error) {
       console.error("Error updating outgoing:", error.response?.data || error.message);
       alert(error.response?.data?.message || "خطا در بروزرسانی خروجی");
       throw error;
-    }
-  };
-
-  // Partial update outgoing
-  const partialUpdateOutgoing = async (id, outgoingData) => {
-    try {
-      const response = await axios.patch(`${OUTGOING_API_URL}/${id}`, outgoingData);
-      alert("خروجی با موفقیت بروزرسانی شد");
-      fetchOutgoings(currentPage);
-      return response.data;
-    } catch (error) {
-      console.error("Error partially updating outgoing:", error);
-      alert("خطا در بروزرسانی جزئی خروجی");
     }
   };
 
@@ -123,26 +120,9 @@ const Outgoing = () => {
     }
   };
 
-  // Search outgoings
-  const searchOutgoings = async () => {
-    try {
-      setLoading(true);
-      // Note: You might need to implement search endpoint in your backend
-      const response = await axios.get(`${OUTGOING_API_URL}?search=${searchTerm}`);
-      setOutgoings(response.data.outgoings);
-    } catch (error) {
-      console.error("Error searching outgoings:", error);
-      alert("خطا در جستجوی خروجی‌ها");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Check stock availability for a size
   const checkStockAvailability = async (size) => {
     try {
-      // You might want to create an endpoint to check stock
-      // For now, we'll fetch from the summary data
       return stockInfo[size] || "0";
     } catch (error) {
       console.error("Error checking stock:", error);
@@ -161,37 +141,61 @@ const Outgoing = () => {
     // If size changed, check stock availability
     if (name === "size" && value) {
       const availableStock = await checkStockAvailability(value);
-      // You can display this info to the user if needed
       console.log(`Available stock for ${value}: ${availableStock}`);
     }
 
     setItems(updatedItems);
+    setHasUnsavedChanges(true);
   };
 
   // Add new empty row
   const addItem = () => {
     setItems([...items, { size: "", quantity: "" }]);
+    setHasUnsavedChanges(true);
   };
 
-  // Remove row from form
+  // Remove row from form - don't allow removal if we have only 5 items (initial state)
   const removeItem = (index) => {
+    if (items.length <= 5) {
+      alert("حداقل باید ۵ مورد موجود باشد");
+      return;
+    }
+
     const updatedItems = items.filter((_, i) => i !== index);
     setItems(updatedItems);
+    setHasUnsavedChanges(true);
   };
 
-  // Reset form
+  // Reset form to initial 5 empty items
   const resetForm = () => {
-    setItems([{ size: "", quantity: "" }]);
+    if (hasUnsavedChanges && !window.confirm("آیا از لغو تغییرات اطمینان دارید؟ تغییرات ذخیره نشده از بین خواهند رفت.")) {
+      return;
+    }
+
+    setItems(createEmptyItems(5));
     setEditingId(null);
+    setHasUnsavedChanges(false);
   };
 
-  // Handle form submission
+  // Handle form submission with smart filtering
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate form
+    // Filter out completely empty items
+    const nonEmptyItems = items.filter(item =>
+      item.size.trim() !== "" ||
+      item.quantity !== ""
+    );
+
+    // If no valid items, show error
+    if (nonEmptyItems.length === 0) {
+      alert("لطفا حداقل یک مورد را پر کنید");
+      return;
+    }
+
+    // Validate filled items
     const validationErrors = [];
-    items.forEach((item, index) => {
+    nonEmptyItems.forEach((item, index) => {
       if (!item.size) validationErrors.push(`سطر ${index + 1}: اندازه را انتخاب کنید`);
       if (!item.quantity || parseFloat(item.quantity) <= 0) validationErrors.push(`سطر ${index + 1}: تعداد معتبر وارد کنید`);
     });
@@ -206,19 +210,30 @@ const Outgoing = () => {
     try {
       // If editing, update existing outgoing
       if (editingId) {
-        await updateOutgoing(editingId, items[0]);
+        await updateOutgoing(editingId, nonEmptyItems[0]);
+        alert("خروجی با موفقیت بروزرسانی شد");
       }
-      // If creating, create each item as separate outgoing
+      // If creating, create each non-empty item as separate outgoing
       else {
-        for (const item of items) {
+        let successCount = 0;
+        for (const item of nonEmptyItems) {
           await createOutgoing({
             size: item.size,
             quantity: item.quantity
           });
+          successCount++;
         }
+        alert(`${successCount} مورد با موفقیت ثبت شد`);
       }
+
+      // Reset form but keep 5 empty items
+      setItems(createEmptyItems(5));
+      setEditingId(null);
+      setHasUnsavedChanges(false);
+      fetchOutgoings(currentPage);
     } catch (error) {
-      // Error is already handled in the create/update functions
+      console.error("Error:", error);
+      // Error is already shown by createOutgoing/updateOutgoing functions
     } finally {
       setLoading(false);
     }
@@ -234,150 +249,124 @@ const Outgoing = () => {
     return new Date(dateString).toLocaleDateString('fa-IR');
   };
 
-
+  // Count filled items
+  const filledItemsCount = items.filter(item =>
+    item.size.trim() !== "" ||
+    item.quantity !== ""
+  ).length;
 
   return (
     <div className="p-6">
       <h2 className="text-2xl font-bold text-cyan-800 mb-6">مدیریت خروجی‌ها</h2>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-red-100 p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold text-red-800">مجموع تعداد فروش</h3>
-          <p className="text-2xl font-bold">{ (summary.totalQuantity)} عدد</p>
-        </div>
-        <div className="bg-green-100 p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold text-green-800">مجموع مبلغ فروش</h3>
-          <p className="text-2xl font-bold">{ (summary.totalMoney)}  افغانی</p>
-        </div>
-        <div className="bg-blue-100 p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold text-blue-800">میانگین ارزش فروش</h3>
-          <p className="text-2xl font-bold">{ (summary.averageSaleValue)}  افغانی</p>
-        </div>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="mb-6 bg-white p-4 rounded-lg shadow">
-        <div className="flex gap-4">
-          <input
-            type="text"
-            placeholder="جستجو بر اساس اندازه یا تاریخ..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-md p-2"
-          />
-          <button
-            onClick={searchOutgoings}
-            className="bg-cyan-600 text-white px-4 py-2 rounded-md hover:bg-cyan-700"
-          >
-            جستجو
-          </button>
-          <button
-            onClick={() => {
-              setSearchTerm("");
-              fetchOutgoings();
-            }}
-            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-          >
-            نمایش همه
-          </button>
-        </div>
-      </div>
-
+      
+    
       {/* Form Section */}
       <div id="outgoing-form" className="mb-8 bg-white p-6 rounded-xl shadow-md">
-        <h3 className="text-lg font-bold text-cyan-800 mb-4">
-          {editingId ? "ویرایش خروجی" : "ثبت خروجی جدید"}
-        </h3>
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          {items.map((item, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end border-b border-gray-200 pb-4 mb-4"
-            >
-              {/* Size */}
-              <div className="md:col-span-2">
-                <label className="block mb-1 text-sm font-medium">اندازه</label>
-                <select
-                  name="size"
-                  value={item.size}
-                  onChange={(e) => handleChange(index, e)}
-                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-cyan-300"
-                  required
-                >
-                  <option value="">انتخاب اندازه</option>
-                  {sizes.map((s) => (
-                    <option key={s.id} value={s.label}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-                {item.size && stockInfo[item.size] && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    موجودی فعلی: { (stockInfo[item.size])} عدد
-                  </p>
+          {items.map((item, index) => {
+            // Check if item is empty
+            const isEmpty = !item.size && !item.quantity;
+
+            return (
+              <div
+                key={index}
+                className={`grid grid-cols-1 md:grid-cols-6 gap-4 items-end border-b border-gray-200 pb-4 mb-4 ${isEmpty ? 'bg-gray-50 p-4 rounded-md border-dashed' : ''}`}
+              >
+                {/* Size */}
+                <div className="md:col-span-3">
+                  <label className="block mb-1 text-sm font-medium">اندازه</label>
+                  <select
+                    name="size"
+                    value={item.size}
+                    onChange={(e) => handleChange(index, e)}
+                    className={`w-full border rounded-md p-2 focus:ring-2 focus:ring-cyan-300 ${isEmpty ? 'border-dashed' : ''}`}
+                  >
+                    <option value="">انتخاب اندازه</option>
+                    {sizes.map((s) => (
+                      <option key={s.id} value={s.label}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                  {item.size && stockInfo[item.size] && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      موجودی فعلی: {parseFloat(stockInfo[item.size] || 0).toLocaleString('en-US')} عدد
+                    </p>
+                  )}
+                </div>
+
+                {/* Quantity */}
+                <div>
+                  <label className="block mb-1 text-sm font-medium">تعداد</label>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={item.quantity}
+                    onChange={(e) => handleChange(index, e)}
+                    className={`w-full border rounded-md p-2 focus:ring-2 focus:ring-cyan-300 ${isEmpty ? 'border-dashed' : ''}`}
+                    placeholder="تعداد"
+                    min="0"
+                    step="0.001"
+                  />
+                </div>
+
+                {/* Remove Button (only show if multiple items and not editing) */}
+                {items.length > 5 && !editingId && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="w-full px-3 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition"
+                      title="حذف این مورد"
+                    >
+                      حذف
+                    </button>
+                  </div>
                 )}
               </div>
-
-              {/* Quantity */}
-              <div>
-                <label className="block mb-1 text-sm font-medium">تعداد</label>
-                <input
-                  type="number"
-                  name="quantity"
-                  value={item.quantity}
-                  onChange={(e) => handleChange(index, e)}
-                  className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-cyan-300"
-                  placeholder="تعداد"
-                  min="0"
-                  step="0.001"
-                  required
-                />
-              </div>
-
-              {/* Remove Button (only show if multiple items and not editing) */}
-              {items.length > 1 && !editingId && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(index)}
-                    className="w-full px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition"
-                  >
-                    حذف
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-200">
             {!editingId && (
-              <button
-                type="button"
-                onClick={addItem}
-                className="flex items-center gap-2 bg-cyan-600 text-white px-4 py-2 rounded-md hover:bg-cyan-700 transition"
-              >
-                + مورد جدید
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="flex items-center gap-2 bg-cyan-600 text-white px-4 py-2 rounded-md hover:bg-cyan-700 transition"
+                >
+                  + مورد جدید (مجموع: {items.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setItems(createEmptyItems(5))}
+                  className="flex items-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition"
+                  disabled={items.length === 5 && !hasUnsavedChanges}
+                >
+                  بازنشانی به ۵ مورد خالی
+                </button>
+              </>
             )}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || filledItemsCount === 0}
               className="flex-1 bg-cyan-800 text-white py-3 rounded-md hover:bg-cyan-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "در حال پردازش..." : editingId ? "بروزرسانی خروجی" : "ثبت خروجی"}
+              {loading ? "در حال پردازش..." :
+                editingId ? "بروزرسانی خروجی" :
+                  `ثبت ${filledItemsCount} مورد خروجی`}
             </button>
 
-            {editingId && (
+            {(editingId || hasUnsavedChanges) && (
               <button
                 type="button"
                 onClick={resetForm}
                 className="bg-gray-400 text-white px-4 py-3 rounded-md hover:bg-gray-500 transition"
               >
-                انصراف
+                {editingId ? "انصراف ویرایش" : "لغو تغییرات"}
               </button>
             )}
           </div>
@@ -386,8 +375,11 @@ const Outgoing = () => {
 
       {/* Outgoings List */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
           <h3 className="text-lg font-bold text-cyan-800">لیست خروجی‌ها ({totalItems} مورد)</h3>
+          <span className="text-sm text-gray-600">
+            صفحه {currentPage} از {totalPages}
+          </span>
         </div>
 
         {loading ? (
@@ -424,7 +416,7 @@ const Outgoing = () => {
                         className="hover:bg-gray-50 border-b last:border-0 transition-colors"
                       >
                         <td className="p-3 text-gray-600">
-                          {(currentPage - 1) * 10 + index + 1}
+                          {(currentPage - 1) * perPage + index + 1}
                         </td>
                         <td className="p-3">
                           <div className="flex flex-col items-center gap-1">
@@ -433,21 +425,21 @@ const Outgoing = () => {
                             </span>
                             {currentStock > 0 && (
                               <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                موجودی: { (currentStock)}
+                                موجودی: {parseFloat(currentStock).toLocaleString('en-US')}
                               </div>
                             )}
                           </div>
                         </td>
                         <td className="p-3">
                           <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
-                            { (outgoing.quantity)}
+                            {parseFloat(outgoing.quantity || 0).toLocaleString('en-US')}
                           </span>
                         </td>
                         <td className="p-3 text-green-700 font-semibold">
-                          { (unitPrice.toFixed(3))}
+                          {unitPrice.toFixed(3).toLocaleString('en-US')}
                         </td>
                         <td className="p-3 text-purple-700 font-bold">
-                          { (outgoing.money)}
+                          {parseFloat(outgoing.money || 0).toLocaleString('en-US')}
                         </td>
                         <td className="p-3 text-gray-500 text-sm">
                           {outgoing.createdAt ?
@@ -483,66 +475,15 @@ const Outgoing = () => {
                     );
                   })}
                 </tbody>
-                {outgoings.length > 0 && (
-                  <tfoot className="bg-gray-50">
-                    <tr>
-                      <td colSpan="2" className="p-3 text-right font-semibold text-gray-700">
-                        مجموع کل:
-                      </td>
-                      <td className="p-3 font-bold text-blue-700">
-                        {outgoings.reduce((sum, outgoing) => sum + (parseFloat(outgoing.quantity) || 0), 0).toLocaleString('en-US')}
-                      </td>
-                      <td className="p-3 font-bold text-green-700">
-                        {outgoings.length > 0
-                          ?  (
-                            (outgoings.reduce((sum, outgoing) => sum + (parseFloat(outgoing.money) || 0), 0) /
-                              outgoings.reduce((sum, outgoing) => sum + (parseFloat(outgoing.quantity) || 0), 0)).toFixed(3)
-                          )
-                          :  (0)
-                        }
-                      </td>
-                      <td className="p-3 font-bold text-purple-700">
-                        { (
-                          outgoings.reduce((sum, outgoing) => sum + (parseFloat(outgoing.money) || 0), 0)
-                        )}
-                      </td>
-                      <td colSpan="2"></td>
-                    </tr>
-                  </tfoot>
-                )}
               </table>
             </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="p-4 border-t border-gray-200 flex justify-center gap-2">
-                <button
-                  onClick={() => fetchOutgoings(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-                >
-                  قبلی
-                </button>
-
-                {[...Array(totalPages)].map((_, i) => (
-                  <button
-                    key={i + 1}
-                    onClick={() => fetchOutgoings(i + 1)}
-                    className={`px-4 py-2 rounded ${currentPage === i + 1 ? 'bg-cyan-600 text-white' : 'bg-gray-100'}`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-
-                <button
-                  onClick={() => fetchOutgoings(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-                >
-                  بعدی
-                </button>
-              </div>
-            )}
+            <div className="p-6 border-t border-gray-200">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
           </>
         )}
       </div>

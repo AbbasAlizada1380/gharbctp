@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import sizes from "../services/Size.js"; // Optional if you want size labels
+import Pagination from "../pagination/Pagination"; // Import the Pagination component
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const EXIST_API_URL = `${BASE_URL}/stock/exist`;
@@ -15,7 +16,9 @@ const ExistingStock = () => {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [perPage, setPerPage] = useState(10);
 
   // Fetch existing stock from API
   const fetchStock = async (page = 1, search = "") => {
@@ -26,7 +29,7 @@ const ExistingStock = () => {
       // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: "10"
+        limit: perPage.toString()
       });
 
       if (search) {
@@ -45,6 +48,7 @@ const ExistingStock = () => {
       if (result.data) {
         // New format: { success: true, count: 1, data: [...] }
         setStockItems(result.data);
+        setTotalItems(result.count || 0);
         setSummary({
           totalItems: result.count || 0,
           totalStock: result.summary?.totalStock || 0,
@@ -54,16 +58,19 @@ const ExistingStock = () => {
       } else if (result.exists) {
         // Alternative format: { exists: [...], summary: {...}, pagination: {...} }
         setStockItems(result.exists);
+        setTotalItems(result.pagination?.totalItems || 0);
         setSummary(result.summary || {});
         setTotalPages(result.pagination?.totalPages || 1);
       } else {
         // Direct array format
         setStockItems(result);
+        setTotalItems(result.length);
         setSummary({
           totalItems: result.length,
           totalStock: result.reduce((sum, item) => sum + parseFloat(item.quantity || 0), 0),
           lowStockCount: 0
         });
+        setTotalPages(1);
       }
 
       setCurrentPage(page);
@@ -79,19 +86,19 @@ const ExistingStock = () => {
   // Fetch stock on component mount and when page/search changes
   useEffect(() => {
     fetchStock(currentPage, searchTerm);
-  }, []);
+  }, [currentPage, searchTerm]);
 
-  // Handle search
-  const handleSearch = (e) => {
-    e.preventDefault();
-    fetchStock(1, searchTerm);
-  };
 
   // Handle page change
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      fetchStock(newPage, searchTerm);
-    }
+    setCurrentPage(newPage);
+  };
+
+  // Handle search reset
+  const handleResetSearch = () => {
+    setSearchTerm("");
+    setCurrentPage(1);
+    fetchStock(1, "");
   };
 
   // Get size label if available
@@ -137,8 +144,17 @@ const ExistingStock = () => {
   return (
     <div className="p-6 bg-white rounded-xl shadow-md">
       <h2 className="text-2xl font-bold text-cyan-800 mb-6">موجودی فعلی انبار</h2>
-
-
+      {/* Page Info */}
+      <div className="mb-4 flex justify-between items-center">
+        <div className="text-sm text-gray-600">
+          نمایش {(currentPage - 1) * perPage + 1} تا {Math.min(currentPage * perPage, totalItems)} از {totalItems} مورد
+        </div>
+        {searchTerm && (
+          <div className="text-sm text-cyan-600">
+            نتایج جستجو برای: "{searchTerm}"
+          </div>
+        )}
+      </div>
 
       {stockItems.length === 0 ? (
         <div className="text-center py-8">
@@ -166,7 +182,7 @@ const ExistingStock = () => {
               </thead>
               <tbody>
                 {stockItems.map((item, index) => {
-                  const rowNumber = (currentPage - 1) * 10 + index + 1;
+                  const rowNumber = (currentPage - 1) * perPage + index + 1;
                   const quantity = parseFloat(item.quantity || 0);
                   const statusClass = getStockStatus(item.quantity);
                   const statusText = getStockStatusText(item.quantity);
@@ -217,77 +233,15 @@ const ExistingStock = () => {
                   );
                 })}
               </tbody>
-              {stockItems.length > 0 && (
-                <tfoot className="bg-gray-50">
-                  <tr>
-                    <td colSpan="2" className="p-3 text-right font-semibold text-gray-700">
-                      مجموع کل:
-                    </td>
-                    <td className="p-3 font-bold text-green-700">
-                      {stockItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0).toLocaleString('en-US')}
-                    </td>
-                    <td className="p-3 font-bold text-blue-700">
-                      {stockItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0) * 50, 0).toLocaleString('en-US')}
-                    </td>
-                    <td colSpan="2"></td>
-                  </tr>
-                </tfoot>
-              )}
             </table>
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-4 py-2 bg-gray-200 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
-              >
-                قبلی
-              </button>
-
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => handlePageChange(pageNum)}
-                      className={`px-4 py-2 rounded-md transition ${currentPage === pageNum
-                        ? 'bg-cyan-600 text-white'
-                        : 'bg-gray-100 hover:bg-gray-200'
-                        }`}
-                    >
-                      {(pageNum)}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-gray-200 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 transition"
-              >
-                بعدی
-              </button>
-
-              <span className="text-sm text-gray-600 mr-2">
-                صفحه {(currentPage)} از {(totalPages)}
-              </span>
+            <div className="pt-4 border-t border-gray-200">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
             </div>
-          )}
         </>
       )}
     </div>
