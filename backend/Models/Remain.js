@@ -10,98 +10,82 @@ const Remain = sequelize.define(
       allowNull: false,
       references: {
         model: Customer,
-        key: 'id'
+        key: "id",
       },
-      onDelete: 'CASCADE',
-      onUpdate: 'CASCADE'
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     },
+
     orderId: {
       type: DataTypes.JSON,
       defaultValue: [],
       get() {
-        const rawValue = this.getDataValue('orderId');
-        return Array.isArray(rawValue) ? rawValue : [];
+        const raw = this.getDataValue("orderId");
+        return Array.isArray(raw) ? raw : [];
       },
       set(value) {
-        const arrayValue = Array.isArray(value) ? value : (value ? [value] : []);
-        this.setDataValue('orderId', arrayValue);
-      }
+        this.setDataValue(
+          "orderId",
+          Array.isArray(value) ? value : value ? [value] : []
+        );
+      },
+    },
+
+    remainOrders: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+      get() {
+        const raw = this.getDataValue("remainOrders");
+        return Array.isArray(raw) ? raw : [];
+      },
+      set(value) {
+        this.setDataValue(
+          "remainOrders",
+          Array.isArray(value) ? value : value ? [value] : []
+        );
+      },
+    },
+
+    receiptOrders: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+      get() {
+        const raw = this.getDataValue("receiptOrders");
+        return Array.isArray(raw) ? raw : [];
+      },
+      set(value) {
+        this.setDataValue(
+          "receiptOrders",
+          Array.isArray(value) ? value : value ? [value] : []
+        );
+      },
     },
   },
   {
     timestamps: true,
-    indexes: [
-      {
-        fields: ['customerId']
-      }
-      // REMOVED the orderId index - it causes the error in MySQL
-    ],
+    indexes: [{ fields: ["customerId"] }],
+
     hooks: {
-      beforeSave: (remain, options) => {
-        // Only merge if we're updating and orderId has changed
-        if (remain.id && remain.changed('orderId')) {
-          const previousOrderIds = remain.previous('orderId') || [];
-          const newOrderIds = remain.orderId || [];
-          
-          // Merge arrays and remove duplicates
-          const mergedOrderIds = [...new Set([...previousOrderIds, ...newOrderIds])];
-          remain.orderId = mergedOrderIds;
-        }
-      }
-    }
+      beforeSave: (remain) => {
+        ["orderId", "remainOrders", "receiptOrders"].forEach((field) => {
+          if (remain.changed(field)) {
+            const prev = remain.previous(field) || [];
+            const next = remain.getDataValue(field) || [];
+            remain.setDataValue(
+              field,
+              [...new Set([...prev, ...next])]
+            );
+          }
+        });
+      },
+    },
   }
 );
 
-// Define associations
-Remain.belongsTo(Customer, { 
-  foreignKey: 'customerId',
-  as: 'customer'
+// Associations
+Remain.belongsTo(Customer, {
+  foreignKey: "customerId",
+  as: "customer",
 });
-
-// Instance methods
-Remain.prototype.addOrderIds = function(orderIds) {
-  const currentOrderIds = this.orderId;
-  const idsToAdd = Array.isArray(orderIds) ? orderIds : [orderIds];
-  
-  idsToAdd.forEach(orderId => {
-    if (orderId && !currentOrderIds.includes(orderId)) {
-      currentOrderIds.push(orderId);
-    }
-  });
-  
-  this.orderId = currentOrderIds;
-  return this;
-};
-
-Remain.prototype.removeOrderIds = function(orderIds) {
-  const currentOrderIds = this.orderId;
-  const idsToRemove = Array.isArray(orderIds) ? orderIds : [orderIds];
-  
-  this.orderId = currentOrderIds.filter(orderId => !idsToRemove.includes(orderId));
-  return this;
-};
-
-Remain.prototype.hasOrderId = function(orderId) {
-  return this.orderId.includes(orderId);
-};
-
-Remain.prototype.clearOrderIds = function() {
-  this.orderId = [];
-  return this;
-};
-
-Remain.prototype.getOrderCount = function() {
-  return this.orderId.length;
-};
-
-// Static method for MySQL
-Remain.findByOrderId = async function(orderId) {
-  return await this.findOne({
-    where: sequelize.where(
-      sequelize.fn('JSON_CONTAINS', sequelize.col('orderId'), JSON.stringify(orderId)),
-      1
-    )
-  });
-};
 
 export default Remain;

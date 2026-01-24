@@ -74,46 +74,28 @@ export const createOrderItem = async (req, res) => {
       transaction,
     });
 
+    const mergeUnique = (a = [], b = []) => [...new Set([...a, ...b])];
+
     if (!remain) {
       remain = await Remain.create(
         {
           customerId,
-          orderId: orderItemIds, // Store as array for new customer
+          orderId: orderItemIds,
+          remainOrders: orderItemIds, // ✅ ADD HERE
         },
         { transaction }
       );
     } else {
-      // ✅ FIXED: Handle existing remain record
-      let existingOrderIds = [];
-      
-      // Check how orderId is stored (array, JSON, or comma-separated)
-      if (Array.isArray(remain.orderId)) {
-        existingOrderIds = remain.orderId;
-      } else if (typeof remain.orderId === 'string') {
-        // If it's stored as comma-separated string
-        existingOrderIds = remain.orderId.split(',').filter(id => id.trim() !== '');
-      } else if (remain.orderId) {
-        // If it's stored as JSON string
-        try {
-          existingOrderIds = JSON.parse(remain.orderId);
-        } catch {
-          existingOrderIds = [remain.orderId];
-        }
-      }
-      
-      // Combine existing and new IDs, remove duplicates
-      const allOrderIds = [...existingOrderIds, ...orderItemIds]
-        .map(id => id.toString())
-        .filter((value, index, self) => self.indexOf(value) === index);
-      
-      // Update the remain record
       await remain.update(
         {
-          orderId: allOrderIds, // Update with combined array
+          orderId: mergeUnique(remain.orderId, orderItemIds),
+          remainOrders: mergeUnique(remain.remainOrders, orderItemIds), // ✅ ADD HERE
         },
         { transaction }
       );
     }
+
+
 
     await transaction.commit();
 

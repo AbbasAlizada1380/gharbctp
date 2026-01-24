@@ -18,12 +18,11 @@ export const createReceipt = async (req, res) => {
   }
 
   const payAmount = parseFloat(amount);
-
   const transaction = await sequelize.transaction();
 
   try {
     /* =====================================================
-       1. Get orderId array from Remain by customerId
+       1. Get Remain record by customerId
     ===================================================== */
     const remain = await Remain.findOne({
       where: { customerId: customer },
@@ -37,15 +36,15 @@ export const createReceipt = async (req, res) => {
       });
     }
 
-    const orderIds = remain.orderId;
+    const allOrderIds = remain.orderId;
+    const remainOrders = remain.remainOrders || [];
+    const receiptOrders = remain.receiptOrders || [];
 
     /* =====================================================
-       2. Find OrderItems using orderIds
+       2. Find OrderItems using remainOrders (unpaid orders)
     ===================================================== */
     const orderItems = await OrderItem.findAll({
-      where: {
-        id: orderIds,
-      },
+      where: { id: remainOrders },
       transaction,
     });
 
@@ -57,7 +56,7 @@ export const createReceipt = async (req, res) => {
     }
 
     /* =====================================================
-       3. Filter items where receipt < money
+       3. Filter unpaid items (receipt < money)
     ===================================================== */
     const unpaidItems = orderItems
       .map(item => ({
@@ -75,46 +74,84 @@ export const createReceipt = async (req, res) => {
     }
 
     /* =====================================================
-       4. Pay starting from minimal ID (STRICT ORDER)
+       4. Pay starting from minimal ID
     ===================================================== */
-
     unpaidItems.sort((a, b) => a.id - b.id);
 
     let remainingAmount = payAmount;
     const paymentDetails = [];
+    const fullyPaidOrderIds = [];
+    const updatedRemainOrders = [...remainOrders];
+    const updatedReceiptOrders = [...receiptOrders];
 
     for (const item of unpaidItems) {
       if (remainingAmount <= 0) break;
 
       const remainingToPay = item.money - item.receipt;
-
       if (remainingToPay <= 0) continue;
 
       const payNow = Math.min(remainingToPay, remainingAmount);
+      const newReceiptAmount = item.receipt + payNow;
 
+      // Update OrderItem receipt
       await OrderItem.update(
-        {
-          receipt: item.receipt + payNow,
-        },
-        {
-          where: { id: item.id },
-          transaction,
-        }
+        { receipt: newReceiptAmount },
+        { where: { id: item.id }, transaction }
       );
 
       paymentDetails.push({
         orderId: item.id,
         paid: payNow,
         previousReceipt: item.receipt,
-        newReceipt: item.receipt + payNow,
-        remaining: item.money - (item.receipt + payNow)
+        newReceipt: newReceiptAmount,
+        remaining: item.money - newReceiptAmount
       });
 
       remainingAmount -= payNow;
+
+      // Check if order is fully paid
+      const isFullyPaid = Math.abs(item.money - newReceiptAmount) < 0.01;
+
+      if (isFullyPaid) {
+        // Track fully paid order IDs
+        fullyPaidOrderIds.push(item.id);
+
+        // Remove from remainOrders array
+        const index = updatedRemainOrders.indexOf(item.id);
+        if (index > -1) {
+          updatedRemainOrders.splice(index, 1);
+        }
+
+        // Add to receiptOrders array
+        if (!updatedReceiptOrders.includes(item.id)) {
+          updatedReceiptOrders.push(item.id);
+        }
+      }
     }
 
     /* =====================================================
-       5. Create Receipt record
+       5. Update all three fields in Remain model
+       IMPORTANT: Update orderId, remainOrders, and receiptOrders
+    ===================================================== */
+    // Remove receiptOrders from remainOrders
+    const finalRemainOrders = updatedRemainOrders.filter(
+      orderId => !updatedReceiptOrders.includes(orderId)
+    );
+
+    // orderId should contain ALL orders (remainOrders + receiptOrders)
+    const allOrders = [...new Set([...finalRemainOrders, ...updatedReceiptOrders])];
+
+    await Remain.update(
+      {
+        orderId: allOrders,           // All orders
+        remainOrders: finalRemainOrders,  // Only unpaid orders
+        receiptOrders: updatedReceiptOrders, // Only fully paid orders
+      },
+      { where: { customerId: customer }, transaction }
+    );
+
+    /* =====================================================
+       6. Create Receipt record
     ===================================================== */
     const receiptRecord = await Receipt.create(
       {
@@ -129,11 +166,15 @@ export const createReceipt = async (req, res) => {
     await transaction.commit();
 
     return res.status(201).json({
-      message: "Receipt created and payments distributed successfully",
+      message: "Receipt created successfully",
       receipt: receiptRecord,
       paymentDetails,
       distributedAmount: payAmount - remainingAmount,
       remainingAmount,
+      fullyPaidOrderIds,
+      orderId: allOrders,            // All orders
+      remainOrders: finalRemainOrders,   // Only unpaid orders
+      receiptOrders: updatedReceiptOrders, // Only fully paid orders
     });
 
   } catch (error) {
@@ -178,7 +219,7 @@ export const getAllReceipts = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    const totalAmount = receipts.reduce((sum, receipt) => 
+    const totalAmount = receipts.reduce((sum, receipt) =>
       sum + parseFloat(receipt.amount || 0), 0
     );
 
@@ -223,7 +264,7 @@ export const getReceiptById = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: "Error fetching receipt",
       error: error.message,
@@ -285,7 +326,7 @@ export const getReceiptsByCustomer = async (req, res) => {
       });
     }
 
-    const totalReceiptAmount = receipts.reduce((sum, receipt) => 
+    const totalReceiptAmount = receipts.reduce((sum, receipt) =>
       sum + parseFloat(receipt.amount || 0), 0
     );
 
@@ -309,7 +350,7 @@ export const getReceiptsByCustomer = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: "Error fetching customer receipts",
       error: error.message,
@@ -419,7 +460,7 @@ export const updateReceipt = async (req, res) => {
       // Update receipt
       const oldPaymentDetails = receipt.paymentDetails ? JSON.parse(receipt.paymentDetails) : [];
       const updatedPaymentDetails = [...oldPaymentDetails, ...newPaymentDetails];
-      
+
       await receipt.update({
         amount: newAmount,
         paymentDetails: JSON.stringify(updatedPaymentDetails),
@@ -485,10 +526,10 @@ export const deleteReceipt = async (req, res) => {
         if (orderItem) {
           const currentReceipt = parseFloat(orderItem.receipt || 0);
           const paidAmount = payment.paid || payment.additionalPaid || 0;
-          
+
           // Subtract the paid amount from receipt field
           const newReceipt = Math.max(0, currentReceipt - paidAmount);
-          
+
           await OrderItem.update(
             { receipt: newReceipt },
             {
@@ -528,7 +569,7 @@ export const deleteReceipt = async (req, res) => {
 export const getReceiptStatistics = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
+
     const where = {};
     if (startDate || endDate) {
       where.createdAt = {};
@@ -549,7 +590,7 @@ export const getReceiptStatistics = async (req, res) => {
 
     // Calculate statistics
     const totalReceipts = receipts.length;
-    const totalAmount = receipts.reduce((sum, receipt) => 
+    const totalAmount = receipts.reduce((sum, receipt) =>
       sum + parseFloat(receipt.amount || 0), 0
     );
     const averageAmount = totalReceipts > 0 ? totalAmount / totalReceipts : 0;
@@ -558,7 +599,7 @@ export const getReceiptStatistics = async (req, res) => {
     const customerStats = [];
     for (const customer of customers) {
       const customerReceipts = receipts.filter(r => r.customer === customer.id);
-      const customerTotal = customerReceipts.reduce((sum, receipt) => 
+      const customerTotal = customerReceipts.reduce((sum, receipt) =>
         sum + parseFloat(receipt.amount || 0), 0
       );
 
@@ -679,7 +720,7 @@ export const getCustomerPaymentSummary = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    const totalReceiptAmount = receipts.reduce((sum, receipt) => 
+    const totalReceiptAmount = receipts.reduce((sum, receipt) =>
       sum + parseFloat(receipt.amount || 0), 0
     );
 
