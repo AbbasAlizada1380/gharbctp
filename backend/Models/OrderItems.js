@@ -41,5 +41,13 @@ const OrderItem = sequelize.define(
     timestamps: true,
   }
 );
+OrderItem.belongsTo(Customer, {
+  foreignKey: 'customerId',
+  as: 'customer'
+});
 
+Customer.hasMany(OrderItem, {
+  foreignKey: 'customerId',
+  as: 'orderItems'
+});
 export default OrderItem;

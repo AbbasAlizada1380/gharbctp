@@ -2,6 +2,7 @@ import OrderItem from "../Models/OrderItems.js";
 import Customer from "../Models/Customers.js";
 import Remain from "../Models/Remain.js";
 import sequelize from "../dbconnection.js";
+import { Op } from "sequelize";
 
 export const createOrderItem = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -277,6 +278,149 @@ export const deleteOrderItem = async (req, res) => {
     console.error(error);
     res.status(500).json({
       message: "Error deleting order item",
+      error: error.message,
+    });
+  }
+};
+
+/* =====================================================
+   GET ORDER ITEMS BY CUSTOMER AND TYPE
+===================================================== */
+/* =====================================================
+   GET ORDER ITEMS BY CUSTOMER AND TYPE
+===================================================== */
+export const getCustomerOrdersByType = async (req, res) => {
+  try {
+    const { customerId, type } = req.params;
+
+    if (!customerId || !type) {
+      return res.status(400).json({
+        success: false,
+        message: "customerId and type are required",
+      });
+    }
+
+    // Validate type parameter
+    const validTypes = ['orderId', 'remainOrders', 'receiptOrders'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid type. Must be one of: orderId, remainOrders, receiptOrders",
+        validTypes,
+      });
+    }
+
+    /* =====================================================
+       1. Find Remain record by customerId
+    ===================================================== */
+    const remain = await Remain.findOne({
+      where: { customerId },
+    });
+
+    if (!remain) {
+      return res.status(404).json({
+        success: false,
+        message: "No customer record found",
+        customerId,
+        type,
+      });
+    }
+
+    /* =====================================================
+       2. Get requested property
+    ===================================================== */
+    let orderIds = [];
+
+    switch (type) {
+      case 'orderId':
+        orderIds = remain.orderId || [];
+        break;
+      case 'remainOrders':
+        orderIds = remain.remainOrders || [];
+        break;
+      case 'receiptOrders':
+        orderIds = remain.receiptOrders || [];
+        break;
+    }
+
+    // If no order IDs found for the requested type
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: `No ${type} found for this customer`,
+        customerId,
+        type,
+        orderIds: [],
+        items: [],
+      });
+    }
+
+    /* =====================================================
+       3. Find OrderItems using orderIds
+    ===================================================== */
+    const orderItems = await OrderItem.findAll({
+      where: {
+        id: orderIds,
+      },
+      order: [['id', 'DESC']], // Latest first
+    });
+
+    /* =====================================================
+       4. Get customer information separately
+    ===================================================== */
+    let customerInfo = null;
+    try {
+      customerInfo = await Customer.findByPk(customerId, {
+        attributes: ['id', 'fullname', 'phoneNumber']
+      });
+    } catch (err) {
+      console.log("Customer not found, continuing without customer info");
+    }
+
+    /* =====================================================
+       5. Format response
+    ===================================================== */
+    const formattedItems = orderItems.map(item => ({
+      id: item.id,
+      customerId: item.customerId,
+      customerName: customerInfo?.fullname || null,
+      money: parseFloat(item.money || 0),
+      receipt: parseFloat(item.receipt || 0),
+      remaining: parseFloat(item.money || 0) - parseFloat(item.receipt || 0),
+      status: parseFloat(item.receipt || 0) >= parseFloat(item.money || 0) ? 'paid' : 'unpaid',
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    }));
+
+    // Calculate totals
+    const totalMoney = formattedItems.reduce((sum, item) => sum + item.money, 0);
+    const totalReceipt = formattedItems.reduce((sum, item) => sum + item.receipt, 0);
+    const totalRemaining = formattedItems.reduce((sum, item) => sum + item.remaining, 0);
+
+    return res.status(200).json({
+      success: true,
+      message: `${type} retrieved successfully`,
+      customerId,
+      type,
+      customerName: customerInfo?.fullname || null,
+      customerInfo: customerInfo || null,
+      orderIds,
+      totalCount: orderItems.length,
+      totalMoney,
+      totalReceipt,
+      totalRemaining,
+      items: formattedItems,
+      summary: {
+        paid: formattedItems.filter(item => item.status === 'paid').length,
+        unpaid: formattedItems.filter(item => item.status === 'unpaid').length,
+      },
+    });
+
+  } catch (error) {
+    console.error("Error in getCustomerOrdersByType:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
       error: error.message,
     });
   }

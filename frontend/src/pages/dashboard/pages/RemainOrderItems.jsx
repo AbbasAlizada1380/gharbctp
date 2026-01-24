@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaBoxOpen, FaSpinner, FaTimes, FaFileInvoiceDollar, FaCalendarAlt, FaMoneyBillWave } from "react-icons/fa";
+import OrderDownload from "./report/OrderDownload";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -50,6 +51,7 @@ const RemainOrderItems = ({ customer, onClose }) => {
           <div className="p-2 bg-white/20 rounded-full">
             <FaBoxOpen className="text-xl" />
           </div>
+          <OrderDownload customerId={customer.id}/>
           <div>
             <h2 className="text-xl font-bold">
               گزارش سفارشات
