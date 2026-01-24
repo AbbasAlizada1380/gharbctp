@@ -46,6 +46,7 @@ const Sidebar = ({ setActiveComponent }) => {
     { name: "رسید ها", value: "Receipt", icon: <FaList /> },
     { name: "گدام", value: "Stock", icon: <FaList /> },
     { name: "مصارف", value: "ExpenseManager", icon: <FaList /> },
+    { name: "برداشت", value: "Money", icon: <FaList /> },
     { name: "کارمندان", value: "StaffManager", icon: <FaList /> },
     { name: "معاشات", value: "SalaryManagement", icon: <FaList /> },
     {

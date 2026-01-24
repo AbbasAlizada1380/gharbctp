@@ -14,6 +14,7 @@ import {
   FaUndo
 } from "react-icons/fa";
 import Pagination from "../pagination/Pagination"; // Import the Pagination component
+import OwnerManager from "./OwnerManager";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -503,6 +504,8 @@ const ReceiptManager = () => {
           )}
         </div>
       )}
+
+     < OwnerManager/>
     </div>
   );
 };

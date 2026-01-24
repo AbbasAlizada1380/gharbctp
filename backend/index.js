@@ -17,6 +17,8 @@ import ExpenseRoute from "./routes/ExpenseRoute.js";
 import StaffRoute from "./routes/StaffRoute.js";
 import AttendenceRoute from "./routes/AttendenceRoute.js";
 import ReceiptRoute from "./routes/ReceiptRoute.js";
+import OwnerRoute from "./routes/OwnerRoute.js";
+import MoneyRoute from "./routes/MoneyRoute.js";
 const FRONT_URL = process.env.FRONT_URL
 const port = 8038;
 const app = express();
@@ -74,6 +76,8 @@ app.use("/expense", ExpenseRoute);
 app.use("/staff", StaffRoute);
 app.use("/attendance", AttendenceRoute);
 app.use("/receipts", ReceiptRoute);
+app.use("/owner", OwnerRoute);
+app.use("/money", MoneyRoute);
 
 // Sync database and start server
 sequelize

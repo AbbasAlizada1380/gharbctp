@@ -187,6 +187,8 @@ export const createReceipt = async (req, res) => {
   }
 };
 
+
+
 /* =====================================================
    GET ALL RECEIPTS (from Receipt table)
 ===================================================== */
