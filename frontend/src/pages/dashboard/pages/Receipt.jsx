@@ -391,12 +391,6 @@ const ReceiptManager = () => {
                     <span>تاریخ ثبت</span>
                   </div>
                 </th>
-                <th className="p-3 border-b font-semibold">
-                  <div className="flex items-center justify-center gap-1">
-                    <FaCalendarAlt />
-                    <span>آخرین ویرایش</span>
-                  </div>
-                </th>
                 <th className="p-3 border-b font-semibold">عملیات</th>
               </tr>
             </thead>
@@ -420,7 +414,7 @@ const ReceiptManager = () => {
                     }`}
                   >
                     <td className="p-3 text-gray-600">
-                      {(currentPage - 1) * perPage + index + 1}
+                      {receipt.id}
                     </td>
                     <td className="p-3">
                       <div className="text-right">
@@ -439,9 +433,6 @@ const ReceiptManager = () => {
                     </td>
                     <td className="p-3 text-gray-500 text-sm">
                       {formatDate(receipt.createdAt)}
-                    </td>
-                    <td className="p-3 text-gray-500 text-sm">
-                      {receipt.updatedAt !== receipt.createdAt ? formatDate(receipt.updatedAt) : "—"}
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-2">

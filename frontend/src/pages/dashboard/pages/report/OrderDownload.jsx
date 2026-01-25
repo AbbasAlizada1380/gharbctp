@@ -117,8 +117,7 @@ const CustomerOrderDownload = ({ customerId }) => {
           halign: "center",
         },
       });
-
-
+      const today = moment().format("jYYYY/jMM/jDD");
       // Summary
       const y = doc.lastAutoTable.finalY + 30;
       doc.setFontSize(11);
@@ -143,6 +142,13 @@ const CustomerOrderDownload = ({ customerId }) => {
         y + 54,
         { align: "right" }
       );
+      doc.text(
+        `صادر شده: ${today}`,
+        550,
+        y + 72,
+        { align: "right" }
+      );
+
 
       doc.save(
         `${type}_${data.customerName}_${moment().format(
