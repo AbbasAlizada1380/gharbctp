@@ -1,31 +1,97 @@
 import React, { useEffect, useRef } from "react";
-import moment from "moment-jalaali";
-import { FaPhone, FaPrint, FaTimes } from "react-icons/fa";
+import { FaPrint, FaTimes, FaCheckCircle, FaFileInvoiceDollar, FaUser, FaCalendarAlt, FaMoneyBillWave } from "react-icons/fa";
 import jalaali from "jalaali-js";
 
 const PrintBillOrder = ({ isOpen, onClose, order, autoPrint }) => {
   const hasAutoPrintedRef = useRef(false);
   const printTimeoutRef = useRef(null);
-  console.log(autoPrint);
-
-  // Helper functions to check if items are filled
-  const isDigitalItemFilled = (item) => {
-    return (
-      item?.name?.trim() !== "" ||
-      (item?.quantity > 0 && (item?.price_per_unit > 0 || item?.money > 0))
-    );
-  };
-
-  const isOffsetItemFilled = (item) => {
-    return (
-      item?.name?.trim() !== "" ||
-      (item?.quantity > 0 && (item?.price_per_unit > 0 || item?.money > 0))
-    );
-  };
 
   const formatCurrency = (num) => {
     const number = Number(num || 0);
-    return number + " افغانی";
+    return new Intl.NumberFormat('fa-IR').format(number) + " افغانی";
+  };
+
+  // Function to convert number to Persian words
+  const convertNumberToPersianWords = (num) => {
+    const number = Math.abs(parseFloat(num) || 0);
+    
+    // If number is 0
+    if (number === 0) return "صفر";
+    
+    // Units in Persian
+    const units = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه'];
+    const teens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده'];
+    const tens = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود'];
+    const hundreds = ['', 'صد', 'دوصد', 'سه صد', 'چهارصد', 'پنجصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد'];
+    
+    // Large numbers in Persian
+    const largeNumbers = [
+      { value: 1000000000, word: 'میلیارد' },
+      { value: 1000000, word: 'میلیون' },
+      { value: 1000, word: 'هزار' }
+    ];
+
+    const convertThreeDigit = (n) => {
+      const hundred = Math.floor(n / 100);
+      const remainder = n % 100;
+      const ten = Math.floor(remainder / 10);
+      const unit = remainder % 10;
+      
+      let words = '';
+      
+      if (hundred > 0) {
+        words += hundreds[hundred] + ' و ';
+      }
+      
+      if (remainder === 0) {
+        return words.slice(0, -3); // Remove " و " if no remainder
+      }
+      
+      if (ten === 1) {
+        words += teens[unit];
+      } else {
+        if (ten > 1) {
+          words += tens[ten];
+          if (unit > 0) {
+            words += ' و ';
+          }
+        }
+        if (unit > 0) {
+          words += units[unit];
+        }
+      }
+      
+      return words.trim();
+    };
+
+    let result = '';
+    let remaining = Math.floor(number);
+    
+    // Handle large numbers
+    for (const large of largeNumbers) {
+      if (remaining >= large.value) {
+        const count = Math.floor(remaining / large.value);
+        const threeDigitWords = convertThreeDigit(count);
+        result += threeDigitWords + ' ' + large.word + ' و ';
+        remaining %= large.value;
+      }
+    }
+    
+    // Handle the rest (less than 1000)
+    if (remaining > 0) {
+      result += convertThreeDigit(remaining);
+    } else {
+      // Remove trailing " و " if nothing left
+      result = result.slice(0, -3);
+    }
+    
+    // Handle decimals (Afghanis)
+    const decimal = Math.round((number - Math.floor(number)) * 100);
+    if (decimal > 0) {
+      result += ' و ' + convertThreeDigit(decimal) + ' پول خرد';
+    }
+    
+    return result.trim() + (result ? ' افغانی' : '');
   };
 
   const handlePrint = () => {
@@ -35,10 +101,7 @@ const PrintBillOrder = ({ isOpen, onClose, order, autoPrint }) => {
   // Auto print functionality
   useEffect(() => {
     if (autoPrint && isOpen && order && !hasAutoPrintedRef.current) {
-      // Set flag to prevent multiple auto-prints
       hasAutoPrintedRef.current = true;
-
-      // Delay print to ensure DOM is fully rendered
       printTimeoutRef.current = setTimeout(() => {
         window.print();
       }, 800);
@@ -63,266 +126,220 @@ const PrintBillOrder = ({ isOpen, onClose, order, autoPrint }) => {
     return null;
   }
 
-  // Filter out empty items
-  const filledDigital = (order.digital || []).filter(isDigitalItemFilled);
-  const filledOffset = (order.offset || []).filter(isOffsetItemFilled);
-
-  // Calculate totals
-  const total_money_digital = filledDigital.reduce(
-    (sum, d) => sum + Number(d.money || 0),
-    0
-  );
-  const total_money_offset = filledOffset.reduce(
-    (sum, o) => sum + Number(o.money || 0),
-    0
-  );
-  const total = total_money_digital + total_money_offset;
-  const remained = total - (order.recip || 0);
-
   // Generate bill number and timestamp
-  const billNumber = order.id
-    ? `${order.id}`
-    : `${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+  const billNumber = order.id ? `${order.id.toString()}` : "---";
 
   function formatToJalali(dateString) {
     const date = new Date(dateString);
-
-    // Convert to Jalali
     const { jy, jm, jd } = jalaali.toJalaali(
       date.getFullYear(),
       date.getMonth() + 1,
       date.getDate()
     );
 
-    // Get time
     let hours = date.getHours();
     const minutes = date.getMinutes();
     const ampm = hours >= 12 ? "بعدازظهر" : "قبل‌ازظهر";
     hours = hours % 12;
-    hours = hours === 0 ? 12 : hours; // convert 0 to 12
+    hours = hours === 0 ? 12 : hours;
 
-    // Pad numbers
     const pad = (n) => (n < 10 ? "0" + n : n);
-
-    return `${jy}/${pad(jm)}/${pad(jd)}, ${pad(hours)}:${pad(minutes)} ${ampm}`;
+    return `${jy}/${pad(jm)}/${pad(jd)} - ${pad(hours)}:${pad(minutes)} ${ampm}`;
   }
+
+  // Get customer information
+  const customer = order.Customer || {};
+  
+  // Convert amount to Persian words
+  const amountInWords = convertNumberToPersianWords(order.amount);
+
   return (
-    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4 print:bg-transparent print:p-0">
-      {/* A5 Container */}
+    <div className="fixed inset-0 bg-gradient-to-br from-gray-900/90 to-gray-800/90 flex justify-center items-center z-50 p-4 print:bg-transparent print:p-0 backdrop-blur-sm">
+      {/* A5 Container with modern design */}
       <div className="px-5">
         <div
           id="printable-area"
-          className="bg-white shadow-2xl rounded-lg py-10 overflow-hidden  flex flex-col print:shadow-none print:rounded-none"
+          className="bg-gradient-to-br from-white to-gray-50 shadow-2xl rounded-2xl py-8 overflow-hidden flex flex-col print:shadow-none print:rounded-none relative border border-gray-200"
           style={{
             width: "148mm",
             height: "210mm",
             direction: "rtl",
           }}
         >
-          {/* Header */}
-          <div
-            id="header-area"
-            className=" py-4 px-4 grid grid-cols-2 text-center"
-          >
-            <div></div>
-            <div className="flex flex-col items-center  mt-2 text-base">
-              <span className="font-semibold">نمبر بل: {billNumber}</span>
-              <span className="font-medium">
-                تاریخ: {formatToJalali(order.createdAt)}
-              </span>
-            </div>
+          {/* Decorative Elements */}
+          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
+          <div className="absolute top-20 right-0 w-24 h-24 opacity-5">
+            <div className="text-6xl">💰</div>
+          </div>
+          <div className="absolute bottom-20 left-0 w-24 h-24 opacity-5">
+            <div className="text-6xl">📄</div>
           </div>
 
-          {/* Customer Info */}
-          <div className="px-3 border-gray-200">
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <div className="font-semibold text-[14px]">
-                <span className="font-semibold">اسم: </span>{" "}
-                {order.customer?.name || order.name || "—"}
+          {/* Header Section */}
+          <div className="px-6 pt-6">
+            <div className="flex justify-between items-center mb-6">
+              <div className="text-right">
+                <h1 className="text-2xl font-bold text-gray-800">رسید پرداخت</h1>
+                <p className="text-sm text-gray-600">Receipt</p>
               </div>
-              <div className=" text-center font-semibold text-[14px]">
-                <span className="font-semibold"> کد: </span>{" "}
-                <span className="">{order.digitalId || "—"}</span>
-              </div>
-              <div className=" text-end font-semibold text-[14px]">
-                <span className="font-semibold">شماره تماس: </span>{" "}
-                <span className="text-[14px]">
-                  {order.customer?.phone_number || order.phone_number || "—"}
-                </span>
+              <div className="text-left">
+                <div className="bg-gradient-to-r from-cyan-50 to-blue-50 px-4 py-3 rounded-xl border border-cyan-100">
+                  <div className="text-xs text-gray-500 font-medium">شماره رسید</div>
+                  <div className="text-xl font-bold text-cyan-700">{billNumber}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {formatToJalali(order.createdAt)}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Content Area */}
-          <div className="flex-1 p-3  overflow-auto">
-            {/* Digital Printing Section */}
-            {filledDigital.length > 0 && (
-              <div className="mb-2 ">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border border-gray-300">
-                    <thead className="">
-                      <tr className="text-md font-semibold">
-                        <th className="p-1 text-center ">#</th>
-                        <th className=" p-1 text-center">مشخصات</th>
-                        <th className=" p-1 text-center ">تعداد</th>
-                        <th className="p-1 text-center ">طول</th>
-                        <th className="  p-1 text-center ">عرض</th>
-                        <th className=" p-1 text-center "> فی متر</th>
-                        <th className="  p-1 text-center 0">مبلغ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filledDigital.map((d, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 p-1 text-center">
-                            {i + 1}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center">
-                            {d.name || "—"}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center">
-                            {d.quantity || 0}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center">
-                            {d.height || 0}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center">
-                            {d.weight || 0}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center">
-                            {d.price_per_unit || 0}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center font-semibold">
-                            {d.money || 0}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          {/* Customer Info with card design */}
+          <div className="px-6 py-4">
+            <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-cyan-100 rounded-lg">
+                  <FaUser className="text-cyan-600" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-800">مشخصات مشتری</h2>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">اسم کامل:</span>
+                    <span className="font-bold text-gray-800 text-sm">
+                      {customer.fullname || "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">کد مشتری:</span>
+                    <span className="font-bold text-cyan-700 bg-cyan-50 px-3 py-1 rounded-full text-sm">
+                      {customer.id || "—"}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">شماره تماس:</span>
+                    <span className="font-medium text-gray-800 text-sm dir-ltr">
+                      {customer.phoneNumber || "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">تاریخ صدور:</span>
+                    <span className="font-medium text-gray-800 text-sm">
+                      {formatToJalali(order.createdAt)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
-
-            {/* Offset Printing Section */}
-            {filledOffset.length > 0 && (
-              <div className=" mt-3">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border border-gray-300">
-                    <thead className="">
-                      <tr className="text-md font-semibold">
-                        <th className=" border-gray-300 p-1 text-center ">#</th>
-                        <th className=" border-gray-300 p-1 text-center">
-                          مشخصات
-                        </th>
-                        <th className=" border-gray-300 p-1 text-center ">
-                          تعداد
-                        </th>
-                        <th className=" border-gray-300 p-1 text-center">
-                          فی متر
-                        </th>
-                        <th className=" p-1 text-center ">مبلغ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filledOffset.map((o, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="border border-gray-300  text-center">
-                            {i + 1}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center">
-                            {o.name || "—"}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center">
-                            {o.quantity || 0}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center">
-                            {o.price_per_unit || 0}
-                          </td>
-                          <td className="border border-gray-300 p-1 text-center font-semibold">
-                            {o.money || 0}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-            <div className="flex items-center py-1 justify-between">
-              {filledDigital.length > 0 && (
-                <div className="flex justify-end mt-1 text-xs font-bold ">
-                  مجموع چاپ دیجیتال: {formatCurrency(total_money_digital)}
-                </div>
-              )}
-              {filledOffset.length > 0 && (
-                <div className="flex justify-end mt-1 text-xs font-bold ">
-                  مجموع چاپ افست: {formatCurrency(total_money_offset)}
-                </div>
-              )}
             </div>
-
-            {/* No Items Message */}
-            {filledDigital.length === 0 && filledOffset.length === 0 && (
-              <div className="text-center py-8 text-gray-500 text-sm border border-dashed border-gray-300 rounded-lg">
-                هیچ محصولی ثبت نشده است
-              </div>
-            )}
           </div>
 
-          {/* Bill Summary */}
-          <div className="flex  h-[110px] border-gray-300 bg-gray-50">
-            {/* Left Half — Totals Section */}
-            <div className="w-1/2 p-4">
-              <div className="space-y-1 ">
-                <div className="flex justify-between font-bold  border-gray-300 pt-1">
-                  <span>مجموع کل:</span>
-                  <span className="">{formatCurrency(total)}</span>
+          {/* Main Content Area */}
+          <div className="flex-1 px-6 py-4">
+            {/* Amount Card with emphasis */}
+            <div className="mb-6">
+              <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 border border-gray-100 shadow-lg">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-3 bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl">
+                    <FaMoneyBillWave className="text-2xl text-emerald-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">مبلغ پرداختی</h2>
+                    <p className="text-sm text-gray-600">Payment Amount</p>
+                  </div>
                 </div>
-                <div className="flex justify-between font-bold  border-gray-300 pt-1 ">
-                  <span>
-                    <strong>دریافتی :</strong>
-                  </span>
-                  <span className="">{formatCurrency(order.recip || 0)}</span>
+
+                <div className="text-center py-4">
+                  <div className="text-5xl font-bold text-emerald-700 mb-3">
+                    {formatCurrency(order.amount)}
+                  </div>
+                  
+                  {/* Amount in words */}
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="text-sm text-gray-600 mb-2 font-medium">مبلغ به حروف:</div>
+                    <div className="text-lg font-bold text-gray-800 leading-relaxed text-center">
+                      {amountInWords}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between font-bold  border-gray-300 pt-1">
-                  <span className={remained > 0 ? "" : ""}>باقیمانده:</span>
-                  <span className={remained > 0 ? "" : ""}>
-                    {formatCurrency(order.remained)}
-                  </span>
+
+                <div className="mt-6 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                    <FaCheckCircle className="text-green-500" />
+                    <span>این رسید به عنوان سند پرداخت معتبر می‌باشد</span>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Right Half — Signature and Stamp Section */}
-            <div className="w-1/2 flex flex-col items-center justify-center p-4 text-center"></div>
+          {/* Footer Section */}
+          <div className="px-6 py-4 border-t border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+            <div className="grid grid-cols-3 gap-6">
+              {/* Signature */}
+              <div className="text-center">
+                <div className="h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-2">
+                  <span className="text-gray-400 text-sm">امضا مسئول</span>
+                </div>
+                <div className="text-xs text-gray-500">امضای مسئول رسید</div>
+              </div>
+
+              {/* Stamp */}
+              <div className="text-center">
+                <div className="h-20 w-20 mx-auto rounded-full flex items-center justify-center mb-2 relative">
+                  <div className="absolute inset-0 rounded-full m-2"></div>
+                  <span className="text-red-500 text-xs font-bold rotate-12">مهر شرکت</span>
+                </div>
+                <div className="text-xs text-gray-500">مهر و اثر شرکت</div>
+              </div>
+
+              {/* Company Info */}
+              <div className="text-center">
+                <div className="h-20 flex flex-col items-center justify-center mb-2">
+                  <div className="text-lg font-bold text-gray-800">شرکت ما</div>
+                  <div className="text-xs text-gray-600 mt-1">تلفن: ۰۷۸۰۱۲۳۴۵۶</div>
+                </div>
+                <div className="text-xs text-gray-500">اطلاعات شرکت</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Information */}
+          <div className="px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-50 text-center border-t border-gray-200">
+            <p className="text-xs text-gray-500">
+              شماره پیگیری: {order.id} • این رسید در سیستم مالی شرکت ثبت شده است
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Action Buttons - Hide during auto-print */}
-      {
-        <div className="absolute bottom-6 left-6 flex gap-3 print:hidden">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 shadow-lg transition-colors"
-          >
-            <FaTimes size={14} /> بستن
-          </button>
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg flex items-center gap-2 shadow-lg transition-colors"
-          >
-            <FaPrint size={14} /> چاپ فاکتور
-          </button>
-        </div>
-      }
+      {/* Action Buttons - Modern Design */}
+      <div className="absolute bottom-8 left-8 right-8 flex justify-center gap-4 print:hidden">
+        <button
+          onClick={onClose}
+          className="px-6 py-3 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white rounded-xl flex items-center gap-3 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5"
+        >
+          <FaTimes size={16} />
+          <span className="font-medium">بستن</span>
+        </button>
+        <button
+          onClick={handlePrint}
+          className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl flex items-center gap-3 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5"
+        >
+          <FaPrint size={16} />
+          <span className="font-medium">چاپ رسید</span>
+        </button>
+      </div>
 
       {/* Print Styles */}
       <style jsx global>{`
         @media print {
           @page {
             size: A5 portrait;
-            margin: 5px;
+            margin: 0;
           }
           body * {
             visibility: hidden;
@@ -338,26 +355,51 @@ const PrintBillOrder = ({ isOpen, onClose, order, autoPrint }) => {
             width: 148mm !important;
             height: 210mm !important;
             margin: 0;
-            padding-right: 20px;
-            padding-left: 5px;
-            padding-top: 28mm; /* space from top */
-            padding-bottom: 28mm; /* space from bottom */
+            padding: 10mm;
             box-shadow: none !important;
             border-radius: 0 !important;
+            border: none !important;
           }
-
+          
+          /* Hide decorative elements for print */
+          #printable-area > div:first-child,
+          #printable-area > div:last-child,
+          #printable-area .absolute {
+            display: none !important;
+          }
+          
+          /* Optimize colors for print */
+          #printable-area {
+            background: white !important;
+            background-image: none !important;
+          }
+          
+          #printable-area .bg-gradient-to-r,
+          #printable-area .bg-gradient-to-br {
+            background: #f8fafc !important;
+          }
+          
+          /* Ensure text is black for better print */
+          #printable-area * {
+            color: #000 !important;
+            border-color: #e5e7eb !important;
+          }
+          
+          /* Print-specific adjustments */
           .print-hidden {
             display: none !important;
           }
         }
-
-        /* Hide scrollbars for print */
-        @media print {
-          ::-webkit-scrollbar {
-            display: none;
-          }
-          -ms-overflow-style: none;
-          scrollbar-width: none;
+        
+        /* Custom direction class */
+        .dir-ltr {
+          direction: ltr;
+        }
+        
+        /* Ensure proper text wrapping for amount in words */
+        .break-words {
+          word-break: break-word;
+          overflow-wrap: break-word;
         }
       `}</style>
     </div>

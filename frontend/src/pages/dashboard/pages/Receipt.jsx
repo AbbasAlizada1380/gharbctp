@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import {
+  FaPrint,
   FaEdit,
   FaTrash,
   FaSave,
@@ -13,9 +14,8 @@ import {
   FaPlus,
   FaUndo
 } from "react-icons/fa";
-import Pagination from "../pagination/Pagination"; // Import the Pagination component
-import OwnerManager from "./OwnerManager";
-
+import Pagination from "../pagination/Pagination";
+import PrintBillOrder from "./PrintOrderBill";
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const initialForm = {
@@ -31,12 +31,17 @@ const ReceiptManager = () => {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState("");
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [totalItems, setTotalItems] = useState(0);
+  const [printModal, setPrintModal] = useState({
+    isOpen: false,
+    order: null,
+    autoPrint: false,
+  });
 
   // Original values for reset during edit
   const [originalReceipt, setOriginalReceipt] = useState(null);
@@ -52,6 +57,39 @@ const ReceiptManager = () => {
     }
   };
 
+  /* ---------------- PRINT RECEIPT ---------------- */
+  const handlePrintReceipt = (receipt) => {
+    // Find the full customer data
+    const customerData = customers.find(c => c.id.toString() === receipt.customer.toString());
+
+    // Prepare the order object in the format PrintBillOrder expects
+    const orderForPrint = {
+      id: receipt.id,
+      amount: receipt.amount,
+      createdAt: receipt.createdAt,
+      updatedAt: receipt.updatedAt,
+      Customer: customerData || {
+        id: receipt.customer,
+        fullname: getCustomerName(receipt.customer),
+        phoneNumber: customerData?.phoneNumber || customerData?.phone || null
+      }
+    };
+
+    setPrintModal({
+      isOpen: true,
+      order: orderForPrint,
+      autoPrint: false, // Set to true if you want auto-print
+    });
+  };
+
+  /* ---------------- CLOSE PRINT MODAL ---------------- */
+  const closePrintModal = () => {
+    setPrintModal({
+      isOpen: false,
+      order: null,
+      autoPrint: false,
+    });
+  };
   /* ---------------- FETCH RECEIPTS WITH PAGINATION ---------------- */
   const fetchReceipts = async () => {
     try {
@@ -60,9 +98,9 @@ const ReceiptManager = () => {
         page: currentPage,
         limit: perPage,
       };
-      
+
       const res = await axios.get(`${BASE_URL}/receipts`, { params });
-      
+
       // Update based on your API response structure
       setReceipts(res.data.data || []);
       setTotalPages(res.data.totalPages || 1);
@@ -113,10 +151,10 @@ const ReceiptManager = () => {
       setEditingId(null);
       setOriginalReceipt(null);
       fetchReceipts(); // Refresh the list
-      
+
       // Show success message
       alert(editingId ? "رسید با موفقیت ویرایش شد" : "رسید با موفقیت ثبت شد");
-      
+
     } catch (error) {
       console.error("Error saving receipt", error);
       setError(error.response?.data?.message || "خطا در ذخیره رسید");
@@ -206,7 +244,7 @@ const ReceiptManager = () => {
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">مدیریت رسیدها</h1>
         <p className="text-gray-600">ثبت و مدیریت رسیدهای پرداختی</p>
-        
+
         {editingId && (
           <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 rounded-xl max-w-md mx-auto">
             <div className="flex items-center justify-center gap-2 text-yellow-800">
@@ -409,9 +447,8 @@ const ReceiptManager = () => {
                 receipts.map((receipt, index) => (
                   <tr
                     key={receipt.id}
-                    className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${
-                      editingId === receipt.id ? "bg-yellow-50" : ""
-                    }`}
+                    className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${editingId === receipt.id ? "bg-yellow-50" : ""
+                      }`}
                   >
                     <td className="p-3 text-gray-600">
                       {receipt.id}
@@ -436,13 +473,22 @@ const ReceiptManager = () => {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-2">
+                        {/* Print Button - Add this button */}
+                        <button
+                          onClick={() => handlePrintReceipt(receipt)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+                          title="چاپ رسید"
+                          disabled={editingId !== null}
+                        >
+                          <FaPrint /> {/* You'll need to import FaPrint from react-icons/fa */}
+                        </button>
+
                         <button
                           onClick={() => handleEdit(receipt)}
-                          className={`p-2 rounded-lg transition ${
-                            editingId === receipt.id
-                              ? "bg-cyan-700 text-white"
-                              : "text-cyan-700 hover:bg-cyan-50"
-                          }`}
+                          className={`p-2 rounded-lg transition ${editingId === receipt.id
+                            ? "bg-cyan-700 text-white"
+                            : "text-cyan-700 hover:bg-cyan-50"
+                            }`}
                           title="ویرایش"
                           disabled={editingId !== null && editingId !== receipt.id}
                         >
@@ -466,13 +512,13 @@ const ReceiptManager = () => {
         </div>
 
         {/* Pagination */}
-          <div className="p-6 border-t border-gray-200">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={(page) => setCurrentPage(page)}
-            />
-          </div>
+        <div className="p-6 border-t border-gray-200">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
+        </div>
       </div>
 
       {/* Editing Warning */}
@@ -495,9 +541,13 @@ const ReceiptManager = () => {
           )}
         </div>
       )}
-
-     < OwnerManager/>
-    </div>
+      <PrintBillOrder
+        isOpen={printModal.isOpen}
+        onClose={closePrintModal}
+        order={printModal.order}
+        autoPrint={printModal.autoPrint}
+      />
+    </div >
   );
 };
 
