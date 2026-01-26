@@ -8,9 +8,16 @@ export default function MoneyManager() {
   const [owners, setOwners] = useState([]);
   const [ownerId, setOwnerId] = useState("");
   const [amount, setAmount] = useState("");
+  const [calculated, setCalculated] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [filters, setFilters] = useState({
+    calculated: "",
+    ownerId: ""
+  });
+  const [summary, setSummary] = useState(null);
+  const [showSummary, setShowSummary] = useState(false);
 
   // 🔹 Fetch owners
   const fetchOwners = async () => {
@@ -18,40 +25,59 @@ export default function MoneyManager() {
     setOwners(res.data.owners);
   };
 
-  // 🔹 Fetch money records
+  // 🔹 Fetch money records with filters
   const fetchMoney = async () => {
-    const res = await axios.get(`${BASE_URL}/money`);
+    const params = new URLSearchParams();
+    if (filters.calculated !== "") params.append("calculated", filters.calculated);
+    if (filters.ownerId) params.append("ownerId", filters.ownerId);
+    
+    const url = `${BASE_URL}/money${params.toString() ? `?${params.toString()}` : ''}`;
+    const res = await axios.get(url);
     setMoneyList(res.data.moneyList);
+  };
+
+  // 🔹 Fetch summary statistics
+  const fetchSummary = async () => {
+    const params = new URLSearchParams();
+    if (filters.ownerId) params.append("ownerId", filters.ownerId);
+    
+    const url = `${BASE_URL}/money/summary${params.toString() ? `?${params.toString()}` : ''}`;
+    const res = await axios.get(url);
+    setSummary(res.data.summary);
   };
 
   useEffect(() => {
     fetchOwners();
     fetchMoney();
-  }, []);
+    fetchSummary();
+  }, [filters]);
 
   // 🔹 Create / Update money
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!ownerId || !amount) return;
+    if (!ownerId || amount === "") return;
 
     setLoading(true);
     try {
+      const data = {
+        ownerId,
+        amount,
+        calculated
+      };
+
       if (editingId) {
-        await axios.put(`${BASE_URL}/money/${editingId}`, {
-          amount,
-        });
+        await axios.put(`${BASE_URL}/money/${editingId}`, data);
       } else {
-        await axios.post(`${BASE_URL}/money`, {
-          ownerId,
-          amount,
-        });
+        await axios.post(`${BASE_URL}/money`, data);
       }
 
       resetForm();
       fetchMoney();
+      fetchSummary();
       setShowForm(false);
     } catch (err) {
       console.error(err);
+      alert(err.response?.data?.message || "خطا در انجام عملیات");
     } finally {
       setLoading(false);
     }
@@ -60,6 +86,7 @@ export default function MoneyManager() {
   const resetForm = () => {
     setOwnerId("");
     setAmount("");
+    setCalculated(false);
     setEditingId(null);
   };
 
@@ -68,52 +95,119 @@ export default function MoneyManager() {
     setEditingId(item.id);
     setOwnerId(item.ownerId);
     setAmount(item.amount);
+    setCalculated(item.calculated);
     setShowForm(true);
   };
 
   // 🔹 Delete
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this record?")) return;
-    await axios.delete(`${BASE_URL}/money/${id}`);
-    fetchMoney();
+    if (!confirm("آیا از حذف این تراکنش اطمینان دارید؟")) return;
+    try {
+      await axios.delete(`${BASE_URL}/money/${id}`);
+      fetchMoney();
+      fetchSummary();
+    } catch (err) {
+      alert(err.response?.data?.message || "خطا در حذف تراکنش");
+    }
+  };
+
+  // 🔹 Handle filter changes
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  // 🔹 Clear filters
+  const clearFilters = () => {
+    setFilters({
+      calculated: "",
+      ownerId: ""
+    });
+  };
+
+  // 🔹 Get owner name by ID
+  const getOwnerName = (ownerId) => {
+    const owner = owners.find(o => o.id == ownerId);
+    return owner ? owner.name : "نامشخص";
   };
 
   const totalAmount = moneyList.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
 
   return (
     <div className="space-y-6" dir="rtl">
-      {/* دکمه نمایش/پنهان کردن فرم */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-800">سابقه تراکنش‌ها</h2>
-        <button
-          onClick={() => {
-            setShowForm(!showForm);
-            if (editingId) resetForm();
-          }}
-          className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${showForm
-            ? "bg-gradient-to-r from-gray-600 to-gray-500 text-white"
-            : "bg-gradient-to-r from-cyan-600 to-cyan-500 text-white hover:from-cyan-700 hover:to-cyan-600"
-            }`}
-        >
-          {showForm ? (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-              بستن فرم
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-              </svg>
-              تراکنش جدید
-            </>
-          )}
-        </button>
-      </div>
+     
 
-      {/* فرم - بهبود یافته */}
+      {/* Summary Panel */}
+      {showSummary && summary && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-lg p-6 animate-fadeIn">
+          
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">مجموع مبلغ</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {summary.totalAmount.toLocaleString()} <span className="text-sm">افغانی</span>
+                  </p>
+                </div>
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">تعداد کل تراکنش‌ها</p>
+                  <p className="text-2xl font-bold text-blue-600">{summary.totalRecords}</p>
+                </div>
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">تراکنش‌های محاسبه‌ای</p>
+                  <p className="text-2xl font-bold text-purple-600">{summary.calculatedRecords}</p>
+                </div>
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">تراکنش‌های دستی</p>
+                  <p className="text-2xl font-bold text-amber-600">{summary.manualRecords}</p>
+                </div>
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* فرم */}
       {showForm && (
         <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl shadow-lg p-6 animate-fadeIn">
           <div className="flex items-center gap-3 mb-6">
@@ -133,7 +227,7 @@ export default function MoneyManager() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   مالک
@@ -165,7 +259,35 @@ export default function MoneyManager() {
                     className="w-full border border-gray-300 rounded-lg pr-10 pl-4 py-3 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors text-left"
                     required
                     dir="ltr"
+                    min="0"
+                    step="0.01"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  نوع تراکنش
+                </label>
+                <div className="flex items-center gap-4 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={!calculated}
+                      onChange={() => setCalculated(false)}
+                      className="w-4 h-4 text-cyan-600"
+                    />
+                    <span className="text-gray-700">تصفیه نشده</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={calculated}
+                      onChange={() => setCalculated(true)}
+                      className="w-4 h-4 text-cyan-600"
+                    />
+                    <span className="text-gray-700">تصفیه شده</span>
+                  </label>
                 </div>
               </div>
             </div>
@@ -211,14 +333,26 @@ export default function MoneyManager() {
         </div>
       )}
 
-      {/* جدول - بهبود یافته */}
+      {/* جدول */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+        <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h4 className="font-semibold text-gray-800">لیست تراکنش‌ها</h4>
+              <p className="text-sm text-gray-600">
+                نمایش {moneyList.length} تراکنش - مجموع: {totalAmount.toLocaleString()} افغانی
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-right py-4 px-6 font-semibold text-gray-700">مالک</th>
                 <th className="text-right py-4 px-6 font-semibold text-gray-700">مبلغ</th>
+                <th className="text-right py-4 px-6 font-semibold text-gray-700">نوع</th>
                 <th className="text-right py-4 px-6 font-semibold text-gray-700">تاریخ</th>
                 <th className="text-right py-4 px-6 font-semibold text-gray-700">عملیات</th>
               </tr>
@@ -228,27 +362,57 @@ export default function MoneyManager() {
               {moneyList.map((item) => (
                 <tr
                   key={item.id}
-                  className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                  className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                    item.calculated ? 'bg-blue-50/50' : ''
+                  }`}
                 >
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-cyan-100 rounded-lg flex items-center justify-center">
-                        <span className="text-cyan-600 font-semibold">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        item.calculated ? 'bg-blue-100' : 'bg-cyan-100'
+                      }`}>
+                        <span className={`font-semibold ${
+                          item.calculated ? 'text-blue-600' : 'text-cyan-600'
+                        }`}>
                           {item.owner?.name?.charAt(0) || "O"}
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-gray-800">{item.owner?.name}</p>
+                        <p className="font-medium text-gray-800">{item.owner?.name || getOwnerName(item.ownerId)}</p>
                         <p className="text-xs text-gray-500">شناسه: {item.id}</p>
                       </div>
                     </div>
                   </td>
                   <td className="py-4 px-6">
-                    <div className="flex items-center gap-2" >
-                      <span className="text-cyan-600 font-bold">
-                        {item.amount}
+                    <div className="flex items-center gap-2" dir="ltr">
+                      <span className="text-gray-700 font-bold">
+                        {parseFloat(item.amount).toLocaleString()}
                       </span>
+                      <span className="text-xs text-gray-500">افغانی</span>
                     </div>
+                  </td>
+                  <td className="py-4 px-6">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                      item.calculated 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {item.calculated ? (
+                        <>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                          </svg>
+                       تصفیه شده
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                          </svg>
+                          تصفیه نشده
+                        </>
+                      )}
+                    </span>
                   </td>
                   <td className="py-4 px-6">
                     <div className="text-gray-600" dir="rtl">
@@ -257,6 +421,12 @@ export default function MoneyManager() {
                         month: 'numeric',
                         day: 'numeric'
                       })}
+                      <div className="text-xs text-gray-500 mt-1">
+                        {new Date(item.createdAt).toLocaleTimeString('fa-IR-u-nu-latn', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
                     </div>
                   </td>
                   <td className="py-4 px-6">

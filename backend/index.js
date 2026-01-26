@@ -6,7 +6,6 @@ import sequelize from "./dbconnection.js";
 import path, { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import cookieParser from "cookie-parser";
-import ReportRouter from "./routes/ordersReportRout.js";
 import CustomerRoute from "./routes/CustomersRoute.js";
 import OrderItemRoute from "./routes/OrderItemsRoute.js";
 import IncomeRoute from "./routes/StockIncomeRoute.js";
@@ -19,6 +18,7 @@ import AttendenceRoute from "./routes/AttendenceRoute.js";
 import ReceiptRoute from "./routes/ReceiptRoute.js";
 import OwnerRoute from "./routes/OwnerRoute.js";
 import MoneyRoute from "./routes/MoneyRoute.js";
+import ReportRoute from "./routes/Reportroute.js";
 const FRONT_URL = process.env.FRONT_URL
 const port = 8038;
 const app = express();
@@ -66,7 +66,6 @@ app.use("/uploads", express.static(uploadsDirectory));
 // Routes
 app.use("/users", userRout);
 app.use("/orderItems", OrderItemRoute);
-app.use("/report", ReportRouter);
 app.use("/stock/income", IncomeRoute);
 app.use("/stock/outgoing", OutgoingRoute);
 app.use("/stock/exist", ExistRoute);
@@ -78,6 +77,7 @@ app.use("/attendance", AttendenceRoute);
 app.use("/receipts", ReceiptRoute);
 app.use("/owner", OwnerRoute);
 app.use("/money", MoneyRoute);
+app.use("/report", ReportRoute);
 
 // Sync database and start server
 sequelize
