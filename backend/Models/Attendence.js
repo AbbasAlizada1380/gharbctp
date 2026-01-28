@@ -61,6 +61,10 @@ const Attendance = sequelize.define(
       type: DataTypes.FLOAT,
       defaultValue: 0,
     },
+    calculated: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
   },
   {
     tableName: "attendance",

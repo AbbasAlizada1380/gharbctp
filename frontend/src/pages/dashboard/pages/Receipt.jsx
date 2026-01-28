@@ -12,7 +12,10 @@ import {
   FaUser,
   FaMoneyBillWave,
   FaPlus,
-  FaUndo
+  FaUndo,
+  FaCalculator,
+  FaPen,
+  FaFilter
 } from "react-icons/fa";
 import Pagination from "../pagination/Pagination";
 import PrintBillOrder from "./PrintOrderBill";
@@ -21,6 +24,7 @@ const BASE_URL = import.meta.env.VITE_BASE_URL;
 const initialForm = {
   customer: "",
   amount: "",
+  calculated: false, // Add calculated field to form
 };
 
 const ReceiptManager = () => {
@@ -43,6 +47,11 @@ const ReceiptManager = () => {
     autoPrint: false,
   });
 
+  // Filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterCalculated, setFilterCalculated] = useState(""); // "", "true", "false"
+  const [filterCustomer, setFilterCustomer] = useState("");
+
   // Original values for reset during edit
   const [originalReceipt, setOriginalReceipt] = useState(null);
 
@@ -57,40 +66,7 @@ const ReceiptManager = () => {
     }
   };
 
-  /* ---------------- PRINT RECEIPT ---------------- */
-  const handlePrintReceipt = (receipt) => {
-    // Find the full customer data
-    const customerData = customers.find(c => c.id.toString() === receipt.customer.toString());
-
-    // Prepare the order object in the format PrintBillOrder expects
-    const orderForPrint = {
-      id: receipt.id,
-      amount: receipt.amount,
-      createdAt: receipt.createdAt,
-      updatedAt: receipt.updatedAt,
-      Customer: customerData || {
-        id: receipt.customer,
-        fullname: getCustomerName(receipt.customer),
-        phoneNumber: customerData?.phoneNumber || customerData?.phone || null
-      }
-    };
-
-    setPrintModal({
-      isOpen: true,
-      order: orderForPrint,
-      autoPrint: false, // Set to true if you want auto-print
-    });
-  };
-
-  /* ---------------- CLOSE PRINT MODAL ---------------- */
-  const closePrintModal = () => {
-    setPrintModal({
-      isOpen: false,
-      order: null,
-      autoPrint: false,
-    });
-  };
-  /* ---------------- FETCH RECEIPTS WITH PAGINATION ---------------- */
+  /* ---------------- FETCH RECEIPTS WITH FILTERS ---------------- */
   const fetchReceipts = async () => {
     try {
       setFetchLoading(true);
@@ -99,9 +75,16 @@ const ReceiptManager = () => {
         limit: perPage,
       };
 
+      // Add filter params
+      if (filterCalculated !== "") {
+        params.calculated = filterCalculated;
+      }
+      if (filterCustomer) {
+        params.customerId = filterCustomer;
+      }
+
       const res = await axios.get(`${BASE_URL}/receipts`, { params });
 
-      // Update based on your API response structure
       setReceipts(res.data.data || []);
       setTotalPages(res.data.totalPages || 1);
       setTotalItems(res.data.count || 0);
@@ -117,15 +100,50 @@ const ReceiptManager = () => {
 
   useEffect(() => {
     fetchCustomers();
+  }, []);
+
+  useEffect(() => {
     fetchReceipts();
-  }, [currentPage, perPage]); // Add pagination dependencies
+  }, [currentPage, perPage, filterCalculated, filterCustomer]);
+
+  /* ---------------- PRINT RECEIPT ---------------- */
+  const handlePrintReceipt = (receipt) => {
+    const customerData = customers.find(c => c.id.toString() === receipt.customer.toString());
+
+    const orderForPrint = {
+      id: receipt.id,
+      amount: receipt.amount,
+      createdAt: receipt.createdAt,
+      updatedAt: receipt.updatedAt,
+      Customer: customerData || {
+        id: receipt.customer,
+        fullname: getCustomerName(receipt.customer),
+        phoneNumber: customerData?.phoneNumber || customerData?.phone || null
+      }
+    };
+
+    setPrintModal({
+      isOpen: true,
+      order: orderForPrint,
+      autoPrint: false,
+    });
+  };
+
+  /* ---------------- CLOSE PRINT MODAL ---------------- */
+  const closePrintModal = () => {
+    setPrintModal({
+      isOpen: false,
+      order: null,
+      autoPrint: false,
+    });
+  };
 
   /* ---------------- HANDLE FORM ---------------- */
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setForm(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 
@@ -138,7 +156,8 @@ const ReceiptManager = () => {
     try {
       const payload = {
         customer: form.customer,
-        amount: parseFloat(form.amount)
+        amount: parseFloat(form.amount),
+        calculated: form.calculated // Include calculated field
       };
 
       if (editingId) {
@@ -150,9 +169,8 @@ const ReceiptManager = () => {
       setForm(initialForm);
       setEditingId(null);
       setOriginalReceipt(null);
-      fetchReceipts(); // Refresh the list
+      fetchReceipts();
 
-      // Show success message
       alert(editingId ? "رسید با موفقیت ویرایش شد" : "رسید با موفقیت ثبت شد");
 
     } catch (error) {
@@ -168,6 +186,7 @@ const ReceiptManager = () => {
     setForm({
       customer: receipt.customer.toString(),
       amount: receipt.amount.toString(),
+      calculated: receipt.calculated || false, // Set calculated value
     });
     setEditingId(receipt.id);
     setOriginalReceipt(receipt);
@@ -186,6 +205,7 @@ const ReceiptManager = () => {
       setForm({
         customer: originalReceipt.customer.toString(),
         amount: originalReceipt.amount.toString(),
+        calculated: originalReceipt.calculated || false,
       });
     }
   };
@@ -196,7 +216,7 @@ const ReceiptManager = () => {
 
     try {
       await axios.delete(`${BASE_URL}/receipts/${id}`);
-      fetchReceipts(); // Refresh the list
+      fetchReceipts();
       alert("رسید با موفقیت حذف شد");
     } catch (error) {
       console.error("Delete error", error);
@@ -204,12 +224,42 @@ const ReceiptManager = () => {
     }
   };
 
+  /* ---------------- BULK UPDATE CALCULATED ---------------- */
+  const handleBulkUpdateCalculated = async (receiptIds, newCalculated) => {
+    if (!confirm(`آیا می‌خواهید وضعیت ${receiptIds.length} رسید را تغییر دهید؟`)) return;
+
+    try {
+      await axios.patch(`${BASE_URL}/receipts/bulk-calculated`, {
+        ids: receiptIds,
+        calculated: newCalculated
+      });
+      fetchReceipts();
+      alert(`وضعیت ${receiptIds.length} رسید با موفقیت تغییر یافت`);
+    } catch (error) {
+      console.error("Bulk update error", error);
+      alert(error.response?.data?.message || "خطا در بروزرسانی دسته‌ای");
+    }
+  };
+
+  /* ---------------- APPLY FILTERS ---------------- */
+  const applyFilters = () => {
+    setCurrentPage(1); // Reset to first page when applying filters
+  };
+
+  /* ---------------- CLEAR FILTERS ---------------- */
+  const clearFilters = () => {
+    setFilterCalculated("");
+    setFilterCustomer("");
+    setCurrentPage(1);
+  };
+
   // Check if form has changes
   const hasChanges = () => {
-    if (!originalReceipt) return true; // New form always has "changes"
+    if (!originalReceipt) return true;
     return (
       form.customer !== originalReceipt.customer.toString() ||
-      form.amount !== originalReceipt.amount.toString()
+      form.amount !== originalReceipt.amount.toString() ||
+      form.calculated !== (originalReceipt.calculated || false)
     );
   };
 
@@ -226,8 +276,10 @@ const ReceiptManager = () => {
     return formatted.replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
   };
 
-  // Calculate total amount for current page
+  // Calculate statistics
   const totalAmount = receipts.reduce((sum, receipt) => sum + parseFloat(receipt.amount || 0), 0);
+  const calculatedAmount = receipts.filter(r => r.calculated).reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+  const manualAmount = receipts.filter(r => !r.calculated).reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
 
   if (fetchLoading && receipts.length === 0) {
     return (
@@ -244,12 +296,46 @@ const ReceiptManager = () => {
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">مدیریت رسیدها</h1>
         <p className="text-gray-600">ثبت و مدیریت رسیدهای پرداختی</p>
+      </div>
 
-        {editingId && (
-          <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 rounded-xl max-w-md mx-auto">
-            <div className="flex items-center justify-center gap-2 text-yellow-800">
-              <FaEdit className="h-5 w-5" />
-              <span className="font-semibold">حالت ویرایش – رسید #{editingId}</span>
+      {/* Filters Section */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+        {showFilters && (
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Customer Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  مشتری
+                </label>
+                <select
+                  value={filterCustomer}
+                  onChange={(e) => setFilterCustomer(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                >
+                  <option value="">همه مشتریان</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.fullname || c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Statistics */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-800">مجموع مبلغ</p>
+                    <p className="text-xl font-bold text-blue-900">
+                      {totalAmount.toLocaleString('en-US')} افغانی
+                    </p>
+                  </div>
+                  <FaMoneyBillWave className="text-blue-600 text-2xl" />
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -323,6 +409,41 @@ const ReceiptManager = () => {
               </div>
             </div>
 
+            {/* Calculated Field */}
+            {editingId&&  <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                نوع رسید
+              </label>
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="calculated"
+                    checked={!form.calculated}
+                    onChange={() => setForm(prev => ({ ...prev, calculated: false }))}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <div className="flex items-center gap-2">
+                    <FaPen className="text-gray-600" />
+                    <span className="text-gray-700">تصفیه نشده</span>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="calculated"
+                    checked={form.calculated}
+                    onChange={() => setForm(prev => ({ ...prev, calculated: true }))}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <div className="flex items-center gap-2">
+                    <FaCalculator className="text-green-600" />
+                    <span className="text-gray-700">تصفیه شده</span>
+                  </div>
+                </label>
+              </div>
+            </div>}
+
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
               {editingId && (
@@ -395,13 +516,6 @@ const ReceiptManager = () => {
                 </p>
               </div>
             </div>
-            {editingId && hasChanges() && (
-              <div className="flex items-center gap-2">
-                <span className="text-yellow-200 text-sm animate-pulse">
-                  تغییرات ذخیره نشده!
-                </span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -411,31 +525,17 @@ const ReceiptManager = () => {
             <thead className="bg-cyan-50 text-cyan-800">
               <tr>
                 <th className="p-3 border-b font-semibold">#</th>
-                <th className="p-3 border-b font-semibold">
-                  <div className="flex items-center justify-center gap-1">
-                    <FaUser />
-                    <span>مشتری</span>
-                  </div>
-                </th>
-                <th className="p-3 border-b font-semibold">
-                  <div className="flex items-center justify-center gap-1">
-                    <FaMoneyBillWave />
-                    <span>مبلغ (افغانی)</span>
-                  </div>
-                </th>
-                <th className="p-3 border-b font-semibold">
-                  <div className="flex items-center justify-center gap-1">
-                    <FaCalendarAlt />
-                    <span>تاریخ ثبت</span>
-                  </div>
-                </th>
+                <th className="p-3 border-b font-semibold">مشتری</th>
+                <th className="p-3 border-b font-semibold">مبلغ (افغانی)</th>
+                <th className="p-3 border-b font-semibold">نوع</th>
+                <th className="p-3 border-b font-semibold">تاریخ ثبت</th>
                 <th className="p-3 border-b font-semibold">عملیات</th>
               </tr>
             </thead>
             <tbody>
               {receipts.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="p-8">
+                  <td colSpan="7" className="p-8">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <FaFileInvoiceDollar className="text-4xl text-gray-300" />
                       <p className="text-lg text-gray-500">هیچ رسیدی یافت نشد</p>
@@ -448,11 +548,9 @@ const ReceiptManager = () => {
                   <tr
                     key={receipt.id}
                     className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${editingId === receipt.id ? "bg-yellow-50" : ""
-                      }`}
+                      } ${receipt.calculated ? 'bg-blue-50/50' : ''}`}
                   >
-                    <td className="p-3 text-gray-600">
-                      {receipt.id}
-                    </td>
+                    <td className="p-3 text-gray-600">{receipt.id}</td>
                     <td className="p-3">
                       <div className="text-right">
                         <div className="font-medium text-gray-800">
@@ -464,8 +562,29 @@ const ReceiptManager = () => {
                       </div>
                     </td>
                     <td className="p-3">
-                      <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">
+                      <span className={`px-3 py-1 rounded-full text-sm font-bold ${receipt.calculated
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-green-100 text-green-800'
+                        }`}>
                         {parseFloat(receipt.amount || 0).toLocaleString('en-US')}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${receipt.calculated
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-700'
+                        }`}>
+                        {receipt.calculated ? (
+                          <>
+                            <FaCalculator className="w-3 h-3" />
+                            تصفیه شده
+                          </>
+                        ) : (
+                          <>
+                            <FaPen className="w-3 h-3" />
+                            تصفیه نشده
+                          </>
+                        )}
                       </span>
                     </td>
                     <td className="p-3 text-gray-500 text-sm">
@@ -473,17 +592,16 @@ const ReceiptManager = () => {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-2">
-                        {/* Print Button - Add this button */}
                         <button
                           onClick={() => handlePrintReceipt(receipt)}
                           className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
                           title="چاپ رسید"
                           disabled={editingId !== null}
                         >
-                          <FaPrint /> {/* You'll need to import FaPrint from react-icons/fa */}
+                          <FaPrint />
                         </button>
 
-                        <button
+                        {/* <button
                           onClick={() => handleEdit(receipt)}
                           className={`p-2 rounded-lg transition ${editingId === receipt.id
                             ? "bg-cyan-700 text-white"
@@ -501,7 +619,7 @@ const ReceiptManager = () => {
                           disabled={editingId !== null}
                         >
                           <FaTrash />
-                        </button>
+                        </button> */}
                       </div>
                     </td>
                   </tr>
@@ -541,13 +659,14 @@ const ReceiptManager = () => {
           )}
         </div>
       )}
+
       <PrintBillOrder
         isOpen={printModal.isOpen}
         onClose={closePrintModal}
         order={printModal.order}
         autoPrint={printModal.autoPrint}
       />
-    </div >
+    </div>
   );
 };
 

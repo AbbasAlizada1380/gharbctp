@@ -20,6 +20,10 @@ const Receipt = sequelize.define(
         min: 0,
       },
     },
+        calculated: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
   },
   {
     timestamps: true,

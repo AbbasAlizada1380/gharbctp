@@ -22,9 +22,14 @@ const Expense = sequelize.define(
         min: 0
       }
     },
+    calculated: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
     description: {
       type: DataTypes.TEXT
     },
+
   },
   {
     timestamps: true,
