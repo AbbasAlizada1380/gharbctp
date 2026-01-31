@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaEdit, FaTrash } from "react-icons/fa";
+import { useSelector } from "react-redux";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -15,6 +16,7 @@ const initialForm = {
 
 const StaffManager = () => {
   const [staffs, setStaffs] = useState([]);
+  const { currentUser } = useSelector((state) => state.user);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
 
@@ -182,7 +184,7 @@ const StaffManager = () => {
               {/* Salary Field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <span className="text-red-500">*</span> معاش ماهانه (افغانی)
+                  <span className="text-red-500">*</span> معاش هفته وار (افغانی)
                 </label>
                 <div className="relative">
                   <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
@@ -302,7 +304,7 @@ const StaffManager = () => {
                     key={staff.id}
                     className="hover:bg-gray-50 border-b last:border-0 transition-colors"
                   >
-                    <td className="p-3 text-gray-600">{index + 1}</td>
+                    <td className="p-3 text-gray-600">{staff.id}</td>
                     <td className="p-3 font-medium text-gray-800">{staff.name}</td>
                     <td className="p-3 text-gray-600">{staff.fatherName}</td>
                     <td className="p-3">
@@ -332,13 +334,13 @@ const StaffManager = () => {
                         >
                           <FaEdit />
                         </button>
-                        <button
+                       {currentUser.role=="admin"&&(<button
                           onClick={() => handleDelete(staff.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
                           title="حذف"
                         >
                           <FaTrash />
-                        </button>
+                        </button>)}
                       </div>
                     </td>
                   </tr>

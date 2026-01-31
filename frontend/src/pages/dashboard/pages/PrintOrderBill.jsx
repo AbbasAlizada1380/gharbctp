@@ -1,30 +1,31 @@
 import React, { useEffect, useRef } from "react";
-import { FaPrint, FaTimes, FaCheckCircle, FaFileInvoiceDollar, FaUser, FaCalendarAlt, FaMoneyBillWave } from "react-icons/fa";
 import jalaali from "jalaali-js";
 
-const PrintBillOrder = ({ isOpen, onClose, order, autoPrint }) => {
-  const hasAutoPrintedRef = useRef(false);
-  const printTimeoutRef = useRef(null);
+const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
+  const hasPrinted = useRef(false);
 
-  const formatCurrency = (num) => {
-    const number = Number(num || 0);
-    return new Intl.NumberFormat('fa-IR').format(number) + " افغانی";
-  };
+  useEffect(() => {
+    if (autoPrint && isOpen && order && !hasPrinted.current) {
+      hasPrinted.current = true;
+      setTimeout(() => window.print(), 500);
+    }
+    if (!isOpen) hasPrinted.current = false;
+  }, [autoPrint, isOpen, order]);
 
-  // Function to convert number to Persian words
+  if (!isOpen || !order) return null;
+
+  const customer = order.Customer || {};
+
+  // تبدیل عدد به حروف دری افغانستان
   const convertNumberToPersianWords = (num) => {
     const number = Math.abs(parseFloat(num) || 0);
-    
-    // If number is 0
     if (number === 0) return "صفر";
-    
-    // Units in Persian
+
     const units = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه'];
     const teens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده'];
     const tens = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود'];
     const hundreds = ['', 'صد', 'دوصد', 'سه صد', 'چهارصد', 'پنجصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد'];
-    
-    // Large numbers in Persian
+
     const largeNumbers = [
       { value: 1000000000, word: 'میلیارد' },
       { value: 1000000, word: 'میلیون' },
@@ -36,374 +37,258 @@ const PrintBillOrder = ({ isOpen, onClose, order, autoPrint }) => {
       const remainder = n % 100;
       const ten = Math.floor(remainder / 10);
       const unit = remainder % 10;
-      
+
       let words = '';
-      
-      if (hundred > 0) {
-        words += hundreds[hundred] + ' و ';
-      }
-      
-      if (remainder === 0) {
-        return words.slice(0, -3); // Remove " و " if no remainder
-      }
-      
-      if (ten === 1) {
-        words += teens[unit];
-      } else {
+      if (hundred > 0) words += hundreds[hundred] + ' و ';
+      if (remainder === 0) return words.slice(0, -3);
+      if (ten === 1) words += teens[unit];
+      else {
         if (ten > 1) {
           words += tens[ten];
-          if (unit > 0) {
-            words += ' و ';
-          }
+          if (unit > 0) words += ' و ';
         }
-        if (unit > 0) {
-          words += units[unit];
-        }
+        if (unit > 0) words += units[unit];
       }
-      
       return words.trim();
     };
 
     let result = '';
     let remaining = Math.floor(number);
-    
-    // Handle large numbers
     for (const large of largeNumbers) {
       if (remaining >= large.value) {
         const count = Math.floor(remaining / large.value);
-        const threeDigitWords = convertThreeDigit(count);
-        result += threeDigitWords + ' ' + large.word + ' و ';
+        result += convertThreeDigit(count) + ' ' + large.word + ' و ';
         remaining %= large.value;
       }
     }
-    
-    // Handle the rest (less than 1000)
-    if (remaining > 0) {
-      result += convertThreeDigit(remaining);
-    } else {
-      // Remove trailing " و " if nothing left
-      result = result.slice(0, -3);
-    }
-    
-    // Handle decimals (Afghanis)
+    if (remaining > 0) result += convertThreeDigit(remaining);
+    else result = result.slice(0, -3);
+
     const decimal = Math.round((number - Math.floor(number)) * 100);
-    if (decimal > 0) {
-      result += ' و ' + convertThreeDigit(decimal) + ' پول خرد';
-    }
-    
+    if (decimal > 0) result += ' و ' + convertThreeDigit(decimal) + ' پول خرد';
     return result.trim() + (result ? ' افغانی' : '');
   };
 
-  const handlePrint = () => {
-    window.print();
+  const formatToJalali = (dateString) => {
+    const d = new Date(dateString);
+    const { jy, jm, jd } = jalaali.toJalaali(
+      d.getFullYear(),
+      d.getMonth() + 1,
+      d.getDate()
+    );
+    return `${jy}/${jm.toString().padStart(2, "0")}/${jd.toString().padStart(2, "0")}`;
   };
 
-  // Auto print functionality
-  useEffect(() => {
-    if (autoPrint && isOpen && order && !hasAutoPrintedRef.current) {
-      hasAutoPrintedRef.current = true;
-      printTimeoutRef.current = setTimeout(() => {
-        window.print();
-      }, 800);
-    }
-
-    return () => {
-      if (printTimeoutRef.current) {
-        clearTimeout(printTimeoutRef.current);
-      }
-    };
-  }, [autoPrint, isOpen, order]);
-
-  // Reset auto-print flag when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      hasAutoPrintedRef.current = false;
-    }
-  }, [isOpen]);
-
-  // Early return if not ready to render
-  if (!isOpen || !order) {
-    return null;
-  }
-
-  // Generate bill number and timestamp
-  const billNumber = order.id ? `${order.id.toString()}` : "---";
-
-  function formatToJalali(dateString) {
-    const date = new Date(dateString);
-    const { jy, jm, jd } = jalaali.toJalaali(
-      date.getFullYear(),
-      date.getMonth() + 1,
-      date.getDate()
-    );
-
-    let hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? "بعدازظهر" : "قبل‌ازظهر";
-    hours = hours % 12;
-    hours = hours === 0 ? 12 : hours;
-
-    const pad = (n) => (n < 10 ? "0" + n : n);
-    return `${jy}/${pad(jm)}/${pad(jd)} - ${pad(hours)}:${pad(minutes)} ${ampm}`;
-  }
-
-  // Get customer information
-  const customer = order.Customer || {};
-  
-  // Convert amount to Persian words
-  const amountInWords = convertNumberToPersianWords(order.amount);
+  const receiptNo = order.id?.toString().padStart(6, "0") || "------";
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-gray-900/90 to-gray-800/90 flex justify-center items-center z-50 p-4 print:bg-transparent print:p-0 backdrop-blur-sm">
-      {/* A5 Container with modern design */}
-      <div className="px-5">
-        <div
-          id="printable-area"
-          className="bg-gradient-to-br from-white to-gray-50 shadow-2xl rounded-2xl py-8 overflow-hidden flex flex-col print:shadow-none print:rounded-none relative border border-gray-200"
-          style={{
-            width: "148mm",
-            height: "210mm",
-            direction: "rtl",
-          }}
-        >
-          {/* Decorative Elements */}
-          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
-          <div className="absolute top-20 right-0 w-24 h-24 opacity-5">
-            <div className="text-6xl">💰</div>
-          </div>
-          <div className="absolute bottom-20 left-0 w-24 h-24 opacity-5">
-            <div className="text-6xl">📄</div>
-          </div>
+    <>
+      {/* Main Component - Always visible when isOpen is true */}
+      <div className={`fixed inset-0 ${isOpen ? 'flex' : 'hidden'} items-center justify-center z-50 bg-black/70 p-4`}>
 
-          {/* Header Section */}
-          <div className="px-6 pt-6">
-            <div className="flex justify-between items-center mb-6">
+        <div className="print-root">
+
+          <div
+            id="printable-area"
+            className="bg-white text-black p-8 shadow-2xl border border-gray-200"
+            style={{
+              direction: "rtl",
+              fontFamily: "'Tahoma', 'Segoe UI', Arial, sans-serif",
+              margin: "0 auto",
+              borderRadius: "8px",
+              background: "linear-gradient(to bottom, #ffffff, #f9fafb)"
+            }}
+          >
+            {/* Decorative Border */}
+            <div className="absolute inset-0 border-2 border-blue-100 pointer-events-none rounded-lg"></div>
+
+            {/* Header */}
+            <div className="relative flex justify-between items-start mb-6 border-b-2 border-blue-200 pb-4">
+              {/* Left: Office Info */}
               <div className="text-right">
-                <h1 className="text-2xl font-bold text-gray-800">رسید پرداخت</h1>
-                <p className="text-sm text-gray-600">Receipt</p>
+                <h1 className="text-2xl font-bold text-blue-900 mb-2 tracking-tight">رسید پرداخت رسمی</h1>
+                <div className="bg-gradient-to-r from-blue-50 to-gray-50 p-3 rounded-lg inline-block">
+                  <p className="text-lg font-semibold text-gray-800">دفتر غرب CTP</p>
+                  <p className="text-gray-600 text-sm mt-1">کابل - افغانستان</p>
+                </div>
               </div>
-              <div className="text-left">
-                <div className="bg-gradient-to-r from-cyan-50 to-blue-50 px-4 py-3 rounded-xl border border-cyan-100">
-                  <div className="text-xs text-gray-500 font-medium">شماره رسید</div>
-                  <div className="text-xl font-bold text-cyan-700">{billNumber}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {formatToJalali(order.createdAt)}
-                  </div>
+
+              {/* Center: Logo */}
+              <div className="absolute left-1/2 transform -translate-x-1/2 top-0">
+                <div className="w-32 h-32 flex items-center justify-center bg-blue-50 rounded-full">
+                  <img src="logo.png" alt="" />
+                </div>
+              </div>
+
+              {/* Right: Receipt Info */}
+              <div className="text-left border-l-2 border-gray-300 pl-3 bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm mb-1">
+                  <strong className="text-gray-700">شماره رسید:</strong>
+                  <span className="text-red-600 font-bold text-base mr-1">{receiptNo}</span>
+                </p>
+                <p className="text-sm mb-1">
+                  <strong className="text-gray-700">تاریخ صدور:</strong>
+                  <span className="text-green-700 font-semibold">{formatToJalali(order.createdAt)}</span>
+                </p>
+                <p className="text-sm">
+                  <strong className="text-gray-700">زمان:</strong>
+                  <span className="text-purple-700 font-semibold">
+                    {new Date(order.createdAt).toLocaleTimeString("en-GB")}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="text-sm leading-8 mt-6 p-5 border-2 border-gray-200 bg-gradient-to-b from-blue-50 to-white rounded-lg shadow-sm">
+              <p className="text-sm text-justify bg-white p-4 rounded border border-gray-100">
+                آقای/خانم
+                <strong className="text-blue-800 mx-1 px-2 py-1 bg-blue-50 rounded">
+                  {customer.fullname || "................"}
+                </strong>
+                با شماره ثبت
+                <strong className="text-green-700 mx-1 px-2 py-1 bg-green-50 rounded">
+                  {customer.id || "................"}
+                </strong>
+                مبلغ
+                <strong className="text-red-700 mx-1 px-2 py-1 bg-red-50 rounded">
+                  {order.amount?.toLocaleString("fa-AF") || "................"} افغانی
+                </strong>
+                (به حروف:
+                <strong className="text-purple-700 mx-1 px-2 py-1 bg-purple-50 rounded">
+                  {convertNumberToPersianWords(order.amount) || "................"}
+                </strong>)
+                را در تاریخ
+                <strong className="text-teal-700 mx-1 px-2 py-1 bg-teal-50 rounded">
+                  {formatToJalali(order.createdAt) || "................"}
+                </strong>
+                به دفتر <strong className="text-blue-900">غرب CTP</strong> بابت کرایه پلیت های کشیده شده شان پرداخت نمود.
+              </p>
+            </div>
+
+            {/* Footer & Signatures */}
+            <div className="flex justify-between items-start mt-6">
+              {/* Payment Receiver */}
+              <div className="text-center w-1/3 px-2">
+                <div className="h-16 w-full border-b-2 border-dashed border-gray-400 mb-2 flex items-center justify-center">
+                  <span className="text-gray-400 text-xs">امضاء اینجا قرار گیرد</span>
+                </div>
+                <div className="bg-gradient-to-r from-gray-50 to-white p-2 rounded border border-gray-200">
+                  <p className="text-sm font-bold text-gray-800">امضای دریافت‌کننده</p>
+                  <p className="text-gray-600 text-xs">(مسئول دفتر غرب CTP)</p>
+                </div>
+              </div>
+
+              {/* System Confirmation */}
+              <div className="text-center w-1/3 px-2">
+                <div className="h-16 w-full flex items-center justify-center border-2 border-dashed border-blue-300 bg-gradient-to-b from-blue-50 to-white rounded-lg shadow-sm">
+                  <p className="text-sm font-bold text-blue-800 flex items-center gap-1">
+                    <span className="text-lg">📋</span>
+                    مهر و امضای سیستم
+                  </p>
+                </div>
+                <div className="mt-2 bg-gradient-to-r from-blue-50 to-cyan-50 p-2 rounded border border-blue-100">
+                  <p className="text-xs font-bold text-gray-800">صدور شده توسط سیستم اتوماسیون اداری</p>
+                  <p className="text-xs text-gray-600 mt-1">کد رهگیری:
+                    <span className="font-bold text-blue-700"> SYS-{receiptNo}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Payer */}
+              <div className="text-center w-1/3 px-2">
+                <div className="h-16 w-full border-b-2 border-dashed border-gray-400 mb-2 flex items-center justify-center">
+                  <span className="text-gray-400 text-xs">امضاء اینجا قرار گیرد</span>
+                </div>
+                <div className="bg-gradient-to-r from-gray-50 to-white p-2 rounded border border-gray-200">
+                  <p className="text-sm font-bold text-gray-800">امضای پرداخت‌کننده</p>
+                  <p className="text-gray-600 text-xs">({customer.fullname || "................"})</p>
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Customer Info with card design */}
-          <div className="px-6 py-4">
-            <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-4 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-cyan-100 rounded-lg">
-                  <FaUser className="text-cyan-600" />
-                </div>
-                <h2 className="text-lg font-bold text-gray-800">مشخصات مشتری</h2>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">اسم کامل:</span>
-                    <span className="font-bold text-gray-800 text-sm">
-                      {customer.fullname || "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">کد مشتری:</span>
-                    <span className="font-bold text-cyan-700 bg-cyan-50 px-3 py-1 rounded-full text-sm">
-                      {customer.id || "—"}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">شماره تماس:</span>
-                    <span className="font-medium text-gray-800 text-sm dir-ltr">
-                      {customer.phoneNumber || "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">تاریخ صدور:</span>
-                    <span className="font-medium text-gray-800 text-sm">
-                      {formatToJalali(order.createdAt)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Content Area */}
-          <div className="flex-1 px-6 py-4">
-            {/* Amount Card with emphasis */}
-            <div className="mb-6">
-              <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 border border-gray-100 shadow-lg">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl">
-                    <FaMoneyBillWave className="text-2xl text-emerald-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-800">مبلغ پرداختی</h2>
-                    <p className="text-sm text-gray-600">Payment Amount</p>
-                  </div>
-                </div>
-
-                <div className="text-center py-4">
-                  <div className="text-5xl font-bold text-emerald-700 mb-3">
-                    {formatCurrency(order.amount)}
-                  </div>
-                  
-                  {/* Amount in words */}
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="text-sm text-gray-600 mb-2 font-medium">مبلغ به حروف:</div>
-                    <div className="text-lg font-bold text-gray-800 leading-relaxed text-center">
-                      {amountInWords}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-gray-100">
-                  <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                    <FaCheckCircle className="text-green-500" />
-                    <span>این رسید به عنوان سند پرداخت معتبر می‌باشد</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Section */}
-          <div className="px-6 py-4 border-t border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-            <div className="grid grid-cols-3 gap-6">
-              {/* Signature */}
-              <div className="text-center">
-                <div className="h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-2">
-                  <span className="text-gray-400 text-sm">امضا مسئول</span>
-                </div>
-                <div className="text-xs text-gray-500">امضای مسئول رسید</div>
-              </div>
-
-              {/* Stamp */}
-              <div className="text-center">
-                <div className="h-20 w-20 mx-auto rounded-full flex items-center justify-center mb-2 relative">
-                  <div className="absolute inset-0 rounded-full m-2"></div>
-                  <span className="text-red-500 text-xs font-bold rotate-12">مهر شرکت</span>
-                </div>
-                <div className="text-xs text-gray-500">مهر و اثر شرکت</div>
-              </div>
-
-              {/* Company Info */}
-              <div className="text-center">
-                <div className="h-20 flex flex-col items-center justify-center mb-2">
-                  <div className="text-lg font-bold text-gray-800">شرکت ما</div>
-                  <div className="text-xs text-gray-600 mt-1">تلفن: ۰۷۸۰۱۲۳۴۵۶</div>
-                </div>
-                <div className="text-xs text-gray-500">اطلاعات شرکت</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Information */}
-          <div className="px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-50 text-center border-t border-gray-200">
-            <p className="text-xs text-gray-500">
-              شماره پیگیری: {order.id} • این رسید در سیستم مالی شرکت ثبت شده است
-            </p>
           </div>
         </div>
+
+        {/* Buttons */}
+        <div className="fixed bottom-6 left-6 flex gap-4 p-4 rounded-xl">
+          <button
+            onClick={onClose}
+            className="px-8 py-3 bg-red-500 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-semibold"
+          >
+            بستن
+          </button>
+
+          <button
+            onClick={() => window.print()}
+            className="px-8 py-3 bg-cyan-500 text-white rounded-lg hover:bg-cyan-700 transition-all duration-200 shadow-md hover:shadow-lg font-semibold flex items-center gap-2"
+          >
+            <span className="text-lg"> </span> چاپ  کردن
+          </button>
+        </div>
+
       </div>
 
-      {/* Action Buttons - Modern Design */}
-      <div className="absolute bottom-8 left-8 right-8 flex justify-center gap-4 print:hidden">
-        <button
-          onClick={onClose}
-          className="px-6 py-3 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white rounded-xl flex items-center gap-3 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5"
-        >
-          <FaTimes size={16} />
-          <span className="font-medium">بستن</span>
-        </button>
-        <button
-          onClick={handlePrint}
-          className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl flex items-center gap-3 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5"
-        >
-          <FaPrint size={16} />
-          <span className="font-medium">چاپ رسید</span>
-        </button>
-      </div>
+      {/* Print-specific styles */}
+      <style jsx global>{`@media print {
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
 
-      {/* Print Styles */}
-      <style jsx global>{`
-        @media print {
-          @page {
-            size: A5 portrait;
-            margin: 0;
-          }
-          body * {
-            visibility: hidden;
-          }
-          #printable-area,
-          #printable-area * {
-            visibility: visible;
-          }
-          #printable-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 148mm !important;
-            height: 210mm !important;
-            margin: 0;
-            padding: 10mm;
-            box-shadow: none !important;
-            border-radius: 0 !important;
-            border: none !important;
-          }
-          
-          /* Hide decorative elements for print */
-          #printable-area > div:first-child,
-          #printable-area > div:last-child,
-          #printable-area .absolute {
-            display: none !important;
-          }
-          
-          /* Optimize colors for print */
-          #printable-area {
-            background: white !important;
-            background-image: none !important;
-          }
-          
-          #printable-area .bg-gradient-to-r,
-          #printable-area .bg-gradient-to-br {
-            background: #f8fafc !important;
-          }
-          
-          /* Ensure text is black for better print */
-          #printable-area * {
-            color: #000 !important;
-            border-color: #e5e7eb !important;
-          }
-          
-          /* Print-specific adjustments */
-          .print-hidden {
-            display: none !important;
-          }
-        }
-        
-        /* Custom direction class */
-        .dir-ltr {
-          direction: ltr;
-        }
-        
-        /* Ensure proper text wrapping for amount in words */
-        .break-words {
-          word-break: break-word;
-          overflow-wrap: break-word;
-        }
-      `}</style>
-    </div>
+  body {
+    background: white !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-root,
+  .print-root * {
+    visibility: visible !important;
+  }
+
+  .print-root {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  #printable-area {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 10mm !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  @page {
+    size: A5 landscape;
+    margin: 0;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+`}</style>
+
+    </>
   );
 };
 
-export default PrintBillOrder;
+export default PrintOrderBill;

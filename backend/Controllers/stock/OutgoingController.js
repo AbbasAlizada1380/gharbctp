@@ -1,6 +1,7 @@
 import Outgoing from "../../Models/Stock/outgoing.js";
 import Income from "../../Models/Stock/income.js";
 import Exist from "../../Models/Stock/exist.js";
+import CompanyStock from "../../Models/CompanyStock.js"; // Import CompanyStock model
 import sequelize from "../../dbconnection.js";
 import { Op } from "sequelize";
 
@@ -30,7 +31,7 @@ const calculateAveragePrice = async (size) => {
       const price = parseFloat(income.price) || 0;
       const spent = parseFloat(income.spent || 0);
       const remaining = qty - spent;
-      
+
       totalQuantity += qty;
       totalValue += qty * price;
       totalRemaining += remaining;
@@ -61,7 +62,7 @@ const allocateQuantityFromIncome = async (size, outgoingQuantity) => {
   try {
     // Get income records for this size, ordered by oldest first (FIFO)
     const incomes = await Income.findAll({
-      where: { 
+      where: {
         size,
         // Get records that still have unsold stock (spent < quantity)
         [Op.and]: [
@@ -96,10 +97,10 @@ const allocateQuantityFromIncome = async (size, outgoingQuantity) => {
       const incomeQty = parseFloat(income.quantity);
       const incomePrice = parseFloat(income.price);
       const incomeSpent = parseFloat(income.spent || 0);
-      
+
       // Calculate available quantity in this income record
       const availableQty = incomeQty - incomeSpent;
-      
+
       if (availableQty <= 0) continue; // This record is already fully spent
 
       // Determine how much to take from this record
@@ -130,7 +131,7 @@ const allocateQuantityFromIncome = async (size, outgoingQuantity) => {
         const spent = parseFloat(income.spent || 0);
         totalAvailable += qty - spent;
       });
-      
+
       throw new Error(`Insufficient available stock in income records. Needed: ${outgoingQuantity}, Available: ${totalAvailable}`);
     }
 
@@ -188,9 +189,9 @@ const updateIncomeSpentAmounts = async (allocations, transaction) => {
 const updateExistTable = async (size, quantity, operation = 'subtract', transaction = null) => {
   try {
     // Find existing record for this size
-    let existRecord = await Exist.findOne({ 
+    let existRecord = await Exist.findOne({
       where: { size },
-      transaction 
+      transaction
     });
 
     if (!existRecord) {
@@ -200,7 +201,7 @@ const updateExistTable = async (size, quantity, operation = 'subtract', transact
     // Update existing record
     const currentQty = parseFloat(existRecord.quantity || 0);
     const changeQty = parseFloat(quantity);
-    
+
     let newQuantity;
     if (operation === 'subtract') {
       newQuantity = currentQty - changeQty;
@@ -229,12 +230,72 @@ const updateExistTable = async (size, quantity, operation = 'subtract', transact
 };
 
 /* ===========================
+   Helper Function: Update or Create CompanyStock Record
+=========================== */
+const updateCompanyStock = async (size, quantity, money, operation = 'subtract', transaction = null) => {
+  try {
+    // Find existing CompanyStock record for this size
+    let companyStockRecord = await CompanyStock.findOne({
+      where: { size },
+      transaction
+    });
+
+    if (!companyStockRecord) {
+      // Create new record if it doesn't exist
+      companyStockRecord = await CompanyStock.create({
+        size,
+        quantity: '0',
+        money: '0'
+      }, { transaction });
+    }
+
+    // Update CompanyStock record
+    const currentQty = parseFloat(companyStockRecord.quantity || 0);
+    const currentMoney = parseFloat(companyStockRecord.money || 0);
+    const changeQty = parseFloat(quantity);
+    const changeMoney = parseFloat(money || 0);
+
+    let newQuantity;
+    let newMoney;
+
+    if (operation === 'subtract') {
+      newQuantity = currentQty - changeQty;
+      newMoney = currentMoney - changeMoney;
+      if (newQuantity < 0) {
+        throw new Error(`Insufficient company stock for size: ${size}. Available: ${currentQty}, Requested: ${changeQty}`);
+      }
+    } else if (operation === 'add') {
+      newQuantity = currentQty + changeQty;
+      newMoney = currentMoney + changeMoney;
+    } else {
+      throw new Error('Invalid operation for company stock update');
+    }
+
+    await companyStockRecord.update({
+      quantity: newQuantity.toString(),
+      money: newMoney.toString()
+    }, { transaction });
+
+    return {
+      companyStockRecord,
+      previousQuantity: currentQty,
+      previousMoney: currentMoney,
+      newQuantity,
+      newMoney
+    };
+  } catch (error) {
+    console.error('Error updating CompanyStock table:', error);
+    throw error;
+  }
+};
+
+/* ===========================
    Helper Function: Get Current Stock
 =========================== */
 const getCurrentStock = async (size, transaction = null) => {
-  const existRecord = await Exist.findOne({ 
+  const existRecord = await Exist.findOne({
     where: { size },
-    transaction 
+    transaction
   });
   return existRecord ? parseFloat(existRecord.quantity || 0) : 0;
 };
@@ -244,7 +305,7 @@ const getCurrentStock = async (size, transaction = null) => {
 =========================== */
 export const createOutgoing = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { size, quantity } = req.body;
 
@@ -262,7 +323,6 @@ export const createOutgoing = async (req, res) => {
         message: "Quantity must be greater than 0",
       });
     }
-
     // Check if sufficient stock exists in Exist table
     const currentStock = await getCurrentStock(size, transaction);
     if (requestedQty > currentStock) {
@@ -274,14 +334,14 @@ export const createOutgoing = async (req, res) => {
 
     // Allocate quantity from Income records using FIFO
     const allocation = await allocateQuantityFromIncome(size, quantity);
-    
+
     // Get average price for information (not for calculation)
     const priceInfo = await calculateAveragePrice(size);
     const averagePrice = parseFloat(priceInfo.averagePrice);
-    
+
     // Calculate total revenue based on actual prices from allocation
     const totalRevenue = parseFloat(allocation.totalRevenue); // This is now based on actual prices
-    
+
     // Calculate profit (revenue minus cost - note: cost and revenue use same prices)
     const profit = totalRevenue - parseFloat(allocation.totalCost);
 
@@ -297,6 +357,16 @@ export const createOutgoing = async (req, res) => {
 
     // Update Exist table (subtract stock)
     const stockUpdate = await updateExistTable(size, quantity, 'subtract', transaction);
+
+    // Update CompanyStock table (add the sold stock)
+    const companyStockUpdate = await updateCompanyStock(
+      size,
+      quantity,
+      totalRevenue.toFixed(3), // 💰 correct money
+      'add',
+      transaction
+    );
+
 
     await transaction.commit();
 
@@ -315,6 +385,15 @@ export const createOutgoing = async (req, res) => {
         previousQuantity: stockUpdate.previousQuantity,
         newQuantity: stockUpdate.newQuantity,
         quantitySubtracted: quantity
+      },
+      companyStockUpdate: {
+        size: companyStockUpdate.companyStockRecord.size,
+        previousQuantity: companyStockUpdate.previousQuantity,
+        previousMoney: companyStockUpdate.previousMoney,
+        newQuantity: companyStockUpdate.newQuantity,
+        newMoney: companyStockUpdate.newMoney,
+        quantityAdded: quantity,
+        moneyAdded: totalRevenue.toFixed(3)
       },
       costAllocation: {
         method: 'FIFO (First-In, First-Out)',
@@ -335,17 +414,17 @@ export const createOutgoing = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.error(error);
-    
-    if (error.message.includes('No income records found') || 
-        error.message.includes('No stock record found') ||
-        error.message.includes('Insufficient stock') ||
-        error.message.includes('No available stock') ||
-        error.message.includes('Insufficient available stock')) {
+
+    if (error.message.includes('No income records found') ||
+      error.message.includes('No stock record found') ||
+      error.message.includes('Insufficient stock') ||
+      error.message.includes('No available stock') ||
+      error.message.includes('Insufficient available stock')) {
       return res.status(400).json({
         message: error.message,
       });
     }
-    
+
     res.status(500).json({
       message: "Error creating outgoing record",
       error: error.message,
@@ -380,10 +459,17 @@ export const getOutgoings = async (req, res) => {
     // Get current stock levels for all sizes
     const allSizes = [...new Set(rows.map(outgoing => outgoing.size))];
     const stockLevels = {};
-    
+    const companyStockLevels = {};
+
     for (const size of allSizes) {
       const stock = await Exist.findOne({ where: { size } });
       stockLevels[size] = stock ? stock.quantity : "0";
+
+      const companyStock = await CompanyStock.findOne({ where: { size } });
+      companyStockLevels[size] = companyStock ? {
+        quantity: companyStock.quantity,
+        money: companyStock.money
+      } : { quantity: "0", money: "0" };
     }
 
     res.json({
@@ -395,6 +481,7 @@ export const getOutgoings = async (req, res) => {
         averageSaleValue: count > 0 ? (totalMoney / count).toFixed(3) : 0
       },
       stockLevels,
+      companyStockLevels,
       pagination: {
         totalItems: count,
         totalPages: Math.ceil(count / limit),
@@ -442,6 +529,13 @@ export const getOutgoingById = async (req, res) => {
     // Get current stock for this size
     const currentStock = await getCurrentStock(outgoing.size);
 
+    // Get company stock for this size
+    const companyStockRecord = await CompanyStock.findOne({ where: { size: outgoing.size } });
+    const companyStock = companyStockRecord ? {
+      quantity: companyStockRecord.quantity,
+      money: companyStockRecord.money
+    } : { quantity: "0", money: "0" };
+
     // Calculate profit
     const revenue = parseFloat(outgoing.money);
     const cost = parseFloat(allocationInfo.totalCost || 0);
@@ -458,6 +552,7 @@ export const getOutgoingById = async (req, res) => {
         profitMargin: revenue > 0 ? ((profit / revenue) * 100).toFixed(2) + '%' : '0%'
       },
       currentStock: currentStock.toString(),
+      companyStock: companyStock,
       unitPrice: (parseFloat(outgoing.money) / parseFloat(outgoing.quantity)).toFixed(3)
     };
 
@@ -476,7 +571,7 @@ export const getOutgoingById = async (req, res) => {
 =========================== */
 export const updateOutgoing = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { id } = req.params;
     const { size, quantity } = req.body;
@@ -496,6 +591,7 @@ export const updateOutgoing = async (req, res) => {
 
     const oldSize = outgoing.size;
     const oldQuantity = parseFloat(outgoing.quantity);
+    const oldMoney = parseFloat(outgoing.money);
     const newQuantity = parseFloat(quantity);
 
     if (newQuantity <= 0) {
@@ -514,6 +610,17 @@ export const updateOutgoing = async (req, res) => {
         }, { transaction });
       }
 
+      // Return to old CompanyStock
+      const oldCompanyStock = await CompanyStock.findOne({ where: { size: oldSize }, transaction });
+      if (oldCompanyStock) {
+        const currentOldQty = parseFloat(oldCompanyStock.quantity);
+        const currentOldMoney = parseFloat(oldCompanyStock.money);
+        await oldCompanyStock.update({
+          quantity: (currentOldQty - oldQuantity).toString(),
+          money: (currentOldMoney - oldMoney).toString()
+        }, { transaction });
+      }
+
       // Check stock availability for new size
       const newExist = await Exist.findOne({ where: { size }, transaction });
       if (!newExist || parseFloat(newExist.quantity || 0) < newQuantity) {
@@ -528,7 +635,7 @@ export const updateOutgoing = async (req, res) => {
       await newExist.update({
         quantity: (currentNewQty - newQuantity).toString()
       }, { transaction });
-    } 
+    }
     else if (newQuantity !== oldQuantity) {
       const existRecord = await Exist.findOne({ where: { size } });
       if (!existRecord) {
@@ -553,11 +660,28 @@ export const updateOutgoing = async (req, res) => {
       await existRecord.update({
         quantity: newStock.toString()
       }, { transaction });
+
+      // Update CompanyStock for quantity change
+      const companyStockRecord = await CompanyStock.findOne({ where: { size }, transaction });
+      if (companyStockRecord) {
+        const currentQty = parseFloat(companyStockRecord.quantity);
+        const currentMoney = parseFloat(companyStockRecord.money);
+
+        // First, remove the old quantity and money
+        const adjustedQty = currentQty - oldQuantity;
+        const adjustedMoney = currentMoney - oldMoney;
+
+        // Then wait for new money calculation
+        await companyStockRecord.update({
+          quantity: adjustedQty.toString(),
+          money: adjustedMoney.toString()
+        }, { transaction });
+      }
     }
 
     // Allocate quantity from Income records for new quantity
     const allocation = await allocateQuantityFromIncome(size, newQuantity);
-    
+
     // Update Income spent quantities for new allocation
     const incomeUpdates = await updateIncomeSpentAmounts(allocation.allocations, transaction);
 
@@ -574,10 +698,30 @@ export const updateOutgoing = async (req, res) => {
       money: newMoney.toFixed(3).toString(),
     }, { transaction });
 
+    // Update CompanyStock with new values
+    const companyStockRecord = await CompanyStock.findOne({ where: { size }, transaction });
+    if (companyStockRecord) {
+      const currentQty = parseFloat(companyStockRecord.quantity);
+      const currentMoney = parseFloat(companyStockRecord.money);
+
+      // Add the new quantity and money
+      await companyStockRecord.update({
+        quantity: (currentQty + newQuantity).toString(),
+        money: (currentMoney + newMoney).toString()
+      }, { transaction });
+    } else {
+      // Create new CompanyStock record if it doesn't exist
+      await CompanyStock.create({
+        size,
+        quantity: newQuantity.toString(),
+        money: newMoney.toFixed(3).toString()
+      }, { transaction });
+    }
+
     await transaction.commit();
 
     const updatedOutgoing = await Outgoing.findByPk(id);
-    
+
     const responseData = {
       ...updatedOutgoing.toJSON(),
       pricing: {
@@ -612,7 +756,7 @@ export const updateOutgoing = async (req, res) => {
 =========================== */
 export const deleteOutgoing = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { id } = req.params;
 
@@ -622,26 +766,45 @@ export const deleteOutgoing = async (req, res) => {
       return res.status(404).json({ message: "Outgoing record not found" });
     }
 
+    const outgoingSize = outgoing.size;
+    const outgoingQuantity = parseFloat(outgoing.quantity);
+    const outgoingMoney = parseFloat(outgoing.money);
+
     // Note: Reversing spent quantities from income records is complex
     // For simplicity, we'll just return stock but not reverse spent amounts
-    
+
     // Return stock to Exist table
-    const existRecord = await Exist.findOne({ 
-      where: { size: outgoing.size },
-      transaction 
+    const existRecord = await Exist.findOne({
+      where: { size: outgoingSize },
+      transaction
     });
 
     if (existRecord) {
       const currentQty = parseFloat(existRecord.quantity);
-      const returnedQty = parseFloat(outgoing.quantity);
       await existRecord.update({
-        quantity: (currentQty + returnedQty).toString()
+        quantity: (currentQty + outgoingQuantity).toString()
       }, { transaction });
     } else {
       // Create new record if doesn't exist
       await Exist.create({
-        size: outgoing.size,
-        quantity: outgoing.quantity
+        size: outgoingSize,
+        quantity: outgoingQuantity.toString()
+      }, { transaction });
+    }
+
+    // Remove from CompanyStock table
+    const companyStockRecord = await CompanyStock.findOne({
+      where: { size: outgoingSize },
+      transaction
+    });
+
+    if (companyStockRecord) {
+      const currentQty = parseFloat(companyStockRecord.quantity);
+      const currentMoney = parseFloat(companyStockRecord.money);
+
+      await companyStockRecord.update({
+        quantity: (currentQty - outgoingQuantity).toString(),
+        money: (currentMoney - outgoingMoney).toString()
       }, { transaction });
     }
 
@@ -649,8 +812,8 @@ export const deleteOutgoing = async (req, res) => {
     await outgoing.destroy({ transaction });
 
     await transaction.commit();
-    
-    res.json({ 
+
+    res.json({
       message: "Outgoing record deleted successfully",
       note: `Stock returned: ${outgoing.quantity} units of size ${outgoing.size}. Note: Spent quantities in income records were not reversed.`
     });
@@ -669,7 +832,7 @@ export const deleteOutgoing = async (req, res) => {
 =========================== */
 export const updateOutgoingProperties = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -682,7 +845,8 @@ export const updateOutgoingProperties = async (req, res) => {
 
     const oldSize = outgoing.size;
     const oldQuantity = parseFloat(outgoing.quantity);
-    
+    const oldMoney = parseFloat(outgoing.money);
+
     // Handle stock adjustments if size or quantity is being updated
     if (updateData.size || updateData.quantity) {
       const newSize = updateData.size || oldSize;
@@ -695,12 +859,23 @@ export const updateOutgoingProperties = async (req, res) => {
 
       // If size changed
       if (newSize !== oldSize) {
-        // Return stock to old size
+        // Return stock to old size in Exist table
         const oldExist = await Exist.findOne({ where: { size: oldSize }, transaction });
         if (oldExist) {
           const currentOldQty = parseFloat(oldExist.quantity);
           await oldExist.update({
             quantity: (currentOldQty + oldQuantity).toString()
+          }, { transaction });
+        }
+
+        // Return to old CompanyStock
+        const oldCompanyStock = await CompanyStock.findOne({ where: { size: oldSize }, transaction });
+        if (oldCompanyStock) {
+          const currentOldQty = parseFloat(oldCompanyStock.quantity);
+          const currentOldMoney = parseFloat(oldCompanyStock.money);
+          await oldCompanyStock.update({
+            quantity: (currentOldQty - oldQuantity).toString(),
+            money: (currentOldMoney - oldMoney).toString()
           }, { transaction });
         }
 
@@ -713,7 +888,7 @@ export const updateOutgoingProperties = async (req, res) => {
           });
         }
 
-        // Subtract from new size
+        // Subtract from new size in Exist table
         const currentNewQty = parseFloat(newExist.quantity);
         await newExist.update({
           quantity: (currentNewQty - newQuantity).toString()
@@ -741,22 +916,63 @@ export const updateOutgoingProperties = async (req, res) => {
         await existRecord.update({
           quantity: newStock.toString()
         }, { transaction });
-      }
 
-      // Allocate quantity from Income records if quantity changed
-      if (newQuantity !== oldQuantity) {
-        const size = updateData.size || outgoing.size;
-        const allocation = await allocateQuantityFromIncome(size, newQuantity);
-        await updateIncomeSpentAmounts(allocation.allocations, transaction);
-        
-        // Recalculate money based on actual prices
-        const newMoney = parseFloat(allocation.totalRevenue);
-        updateData.money = newMoney.toFixed(3).toString();
+        // Update CompanyStock for quantity change
+        const companyStockRecord = await CompanyStock.findOne({ where: { size: oldSize }, transaction });
+        if (companyStockRecord) {
+          const currentQty = parseFloat(companyStockRecord.quantity);
+          const currentMoney = parseFloat(companyStockRecord.money);
+
+          // First, remove the old quantity and money
+          const adjustedQty = currentQty - oldQuantity;
+          const adjustedMoney = currentMoney - oldMoney;
+
+          await companyStockRecord.update({
+            quantity: adjustedQty.toString(),
+            money: adjustedMoney.toString()
+          }, { transaction });
+        }
       }
+    }
+
+    // Allocate quantity from Income records if quantity changed
+    let newMoney = oldMoney;
+    if (updateData.quantity && parseFloat(updateData.quantity) !== oldQuantity) {
+      const size = updateData.size || outgoing.size;
+      const quantity = updateData.quantity;
+      const allocation = await allocateQuantityFromIncome(size, quantity);
+      await updateIncomeSpentAmounts(allocation.allocations, transaction);
+
+      // Recalculate money based on actual prices
+      newMoney = parseFloat(allocation.totalRevenue);
+      updateData.money = newMoney.toFixed(3).toString();
     }
 
     // Update outgoing record
     await outgoing.update(updateData, { transaction });
+
+    // Update CompanyStock with final values
+    const finalSize = updateData.size || oldSize;
+    const finalQuantity = updateData.quantity ? parseFloat(updateData.quantity) : oldQuantity;
+
+    const companyStockRecord = await CompanyStock.findOne({ where: { size: finalSize }, transaction });
+    if (companyStockRecord) {
+      const currentQty = parseFloat(companyStockRecord.quantity);
+      const currentMoney = parseFloat(companyStockRecord.money);
+
+      // Add the final quantity and money
+      await companyStockRecord.update({
+        quantity: (currentQty + finalQuantity).toString(),
+        money: (currentMoney + newMoney).toString()
+      }, { transaction });
+    } else {
+      // Create new CompanyStock record if it doesn't exist
+      await CompanyStock.create({
+        size: finalSize,
+        quantity: finalQuantity.toString(),
+        money: newMoney.toFixed(3).toString()
+      }, { transaction });
+    }
 
     await transaction.commit();
 

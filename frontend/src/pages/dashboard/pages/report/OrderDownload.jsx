@@ -29,6 +29,7 @@ const CustomerOrderDownload = ({ customerId }) => {
         alert("هیچ اطلاعاتی یافت نشد");
         return;
       }
+
       const toFaNumber = (value) => {
         if (value === null || value === undefined) return "";
         return value.toString().replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
@@ -40,6 +41,7 @@ const CustomerOrderDownload = ({ customerId }) => {
         format: "a4",
       });
       doc.setR2L(false);
+
       // Font
       doc.addFileToVFS("Vazirmatn.ttf", VazirmatnTTF);
       doc.addFont("Vazirmatn.ttf", "Vazirmatn", "normal");
@@ -54,54 +56,31 @@ const CustomerOrderDownload = ({ customerId }) => {
         { align: "right" }
       );
 
-      // Table headers
+      // Reverse Table headers
       const headers = [
-        [
-          "شماره سفارش",
-          "تاریخ",
-          "مبلغ",
-          "دریافتی",
-          "باقیمانده",
-          "وضعیت",
-        ]
+        ["باقیمانده", "دریافتی", "مبلغ", "تعداد", "نام فایل", "سایز", "تاریخ", "شماره"]
       ];
 
-      // Table data
+      // Reverse Table body
       const body = data.items.map((item) => [
-        item.status === "paid" ? "پرداخت‌شده" : "باقیمانده‌دار",
         toFaNumber(item.remaining),
         toFaNumber(item.receipt),
         toFaNumber(item.money),
-        moment(item.createdAt).format("jYYYY/jMM/jDD"),
-        toFaNumber(item.id), // ✅ FIXED
+        toFaNumber(item.qnty),
+        (item.fileName),
+        toFaNumber(item.size),
+        moment(item.createdAt).format("YYYY/MM/DD"),
+        toFaNumber(item.id),
       ]);
 
-      doc.setR2L(false);
-
       autoTable(doc, {
-        startY: 142,          // first page (5cm)
-        margin: { top: 142 }, // 👈 ALL pages (5cm)
+        startY: 142,
+        margin: { top: 142 },
 
-        head: [[
-          "شماره سفارش",
-          "تاریخ",
-          "مبلغ",
-          "دریافتی",
-          "باقیمانده",
-          "وضعیت",
-        ]],
-
-        body: data.items.map((item) => [
-          toFaNumber(item.id),
-          moment(item.createdAt).format("jYYYY/jMM/jDD"),
-          toFaNumber(item.money),
-          toFaNumber(item.receipt),
-          toFaNumber(item.remaining),
-          item.status === "paid" ? "پرداخت‌شده" : "باقیمانده‌دار",
-        ]),
+        head: headers,
+        body: body,
 
         theme: "grid",
-
         styles: {
           font: "Vazirmatn",
           fontSize: 10,
@@ -117,44 +96,22 @@ const CustomerOrderDownload = ({ customerId }) => {
           halign: "center",
         },
       });
-      const today = moment().format("jYYYY/jMM/jDD");
-      // Summary
-      const y = doc.lastAutoTable.finalY + 30;
-      doc.setFontSize(11);
-      doc.text(`مجموع سفارشات: ${data.totalCount.toLocaleString("fa-Af")}.`, 550, y, {
-        align: "right",
-      });
-      doc.text(
-        `مجموع مبلغ: ${data.totalMoney.toLocaleString("fa-AF")}`,
-        550,
-        y + 18,
-        { align: "right" }
-      );
-      doc.text(
-        `دریافتی: ${data.totalReceipt.toLocaleString("fa-AF")}`,
-        550,
-        y + 36,
-        { align: "right" }
-      );
-      doc.text(
-        `باقیمانده: ${data.totalRemaining.toLocaleString("fa-AF")}`,
-        550,
-        y + 54,
-        { align: "right" }
-      );
-      doc.text(
-        `صادر شده: ${today}`,
-        550,
-        y + 72,
-        { align: "right" }
-      );
 
+      const today = moment().format("jYYYY/jMM/jDD");
+      const y = doc.lastAutoTable.finalY + 30;
+
+      // Summary
+      doc.setFontSize(11);
+      doc.text(`مجموع سفارشات: ${data.totalCount.toLocaleString("fa-AF")}`, 550, y, { align: "right" });
+      doc.text(`مجموع مبلغ: ${data.totalMoney.toLocaleString("fa-AF")}`, 550, y + 18, { align: "right" });
+      doc.text(`دریافتی: ${data.totalReceipt.toLocaleString("fa-AF")}`, 550, y + 36, { align: "right" });
+      doc.text(`باقیمانده: ${data.totalRemaining.toLocaleString("fa-AF")}`, 550, y + 54, { align: "right" });
+      doc.text(`صادر شده: ${today}`, 550, y + 72, { align: "right" });
 
       doc.save(
-        `${type}_${data.customerName}_${moment().format(
-          "jYYYY-jMM-jDD"
-        )}.pdf`
+        `${type}_${data.customerName}_${moment().format("jYYYY-jMM-jDD")}.pdf`
       );
+
     } catch (err) {
       console.error(err);
       alert("خطا در دریافت اطلاعات");
@@ -162,6 +119,7 @@ const CustomerOrderDownload = ({ customerId }) => {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="p-6 flex items-center gap-4">

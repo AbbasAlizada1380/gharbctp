@@ -224,7 +224,7 @@ const ExistingStock = () => {
                       <td className="p-3 text-gray-500 text-sm">
                         {item.updatedAt ?
                           new Date(item.updatedAt)
-                            .toLocaleDateString('fa-IR')
+                            .toLocaleDateString('eng-en')
                             .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
                           : '—'
                         }

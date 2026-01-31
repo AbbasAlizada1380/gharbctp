@@ -6,9 +6,30 @@ import OrderDownload from "./report/OrderDownload";
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const RemainOrderItems = ({ customer, onClose }) => {
+  const [remainingMoney, setRemainingMoney] = useState(0);
   const [orderItems, setOrderItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const fetchRemainData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const res = await axios.get(`${BASE_URL}/remain/customer`);
+
+      const foundCustomer = res.data.customers.find(
+        (item) => item.customer.id == customer.id
+      );
+
+      setRemainingMoney(foundCustomer?.remainingMoney || 0);
+    } catch (err) {
+      console.error(err);
+      setError("خطا در دریافت مبلغ باقیمانده");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!customer || !customer.id) return;
@@ -34,6 +55,7 @@ const RemainOrderItems = ({ customer, onClose }) => {
     };
 
     fetchRemainOrderItems();
+    fetchRemainData()
   }, [customer]);
 
   if (!customer) return null;
@@ -51,13 +73,16 @@ const RemainOrderItems = ({ customer, onClose }) => {
           <div className="p-2 bg-white/20 rounded-full">
             <FaBoxOpen className="text-xl" />
           </div>
-          <OrderDownload customerId={customer.id}/>
+          <OrderDownload customerId={customer.id} />
           <div>
             <h2 className="text-xl font-bold">
               گزارش سفارشات
             </h2>
             <p className="text-sm text-white/80">
               مشتری: <span className="font-semibold">{customer.fullname}</span>
+            </p>
+            <p className="text-sm text-white/80">
+              باقیمانده: <span className="font-semibold">{remainingMoney}</span>
             </p>
           </div>
         </div>
@@ -149,7 +174,7 @@ const RemainOrderItems = ({ customer, onClose }) => {
                       <td className="p-3 text-gray-500 text-sm">
                         {item.createdAt ?
                           new Date(item.createdAt)
-                            .toLocaleDateString('fa-IR')
+                            .toLocaleDateString('eng-en')
                             .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
                           : '—'
                         }

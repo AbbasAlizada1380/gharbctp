@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaEdit, FaTrash, FaCheck, FaTimes } from "react-icons/fa";
+import { useSelector } from "react-redux";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -18,10 +19,13 @@ const initialForm = {
 };
 
 const SalaryManagement = () => {
+  const { currentUser } = useSelector((state) => state.user);
   const [staffs, setStaffs] = useState([]);
   const [records, setRecords] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(initialForm);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // ---------------- FETCH DATA ----------------
   const fetchStaff = async () => {
@@ -53,10 +57,13 @@ const SalaryManagement = () => {
     }));
   };
 
-  // ---------------- CREATE / UPDATE ----------------
   const handleSubmit = async e => {
     e.preventDefault();
+    if (submitting) return; // ⛔ جلوگیری از دوبار submit
+
     try {
+      setSubmitting(true);
+
       if (editingId) {
         await axios.put(`${BASE_URL}/attendance/${editingId}`, {
           attendance: form.attendance,
@@ -66,17 +73,19 @@ const SalaryManagement = () => {
         await axios.post(`${BASE_URL}/attendance`, form);
       }
 
-      // Refresh records after update/create
       await fetchAttendance();
 
-      // Reset form
       setForm(initialForm);
       setEditingId(null);
+      setShowForm(false);
 
     } catch (error) {
       console.error("Error saving attendance:", error);
+    } finally {
+      setSubmitting(false);
     }
   };
+
 
   // ---------------- EDIT ----------------
   const handleEdit = record => {
@@ -86,6 +95,7 @@ const SalaryManagement = () => {
       receipt: record.receipt || 0,
       attendance: record.attendance,
     });
+    setShowForm(!showForm)
   };
 
 
@@ -124,6 +134,19 @@ const SalaryManagement = () => {
           </div>
         )}
       </div>
+      <div className="flex justify-center mb-6">
+        <button
+          onClick={() => {
+            setForm(initialForm);
+            setEditingId(null);
+            setShowForm(prev => !prev);
+          }}
+          className="px-6 py-3 bg-gradient-to-r from-cyan-800 to-cyan-600 text-white rounded-xl hover:from-cyan-900 hover:to-cyan-700 transition font-medium shadow-md"
+        >
+          {showForm ? "بستن فرم" : "ثبت حضور و غیاب جدید"}
+        </button>
+      </div>
+
 
       {/* Form Section */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
@@ -147,145 +170,176 @@ const SalaryManagement = () => {
         </div>
 
         {/* Form Content */}
-        <div className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Staff Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <span className="text-red-500">*</span> انتخاب کارمند
-              </label>
-              <select
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                value={form.staffId}
-                onChange={e => setForm({ ...form, staffId: e.target.value })}
-                required
-              >
-                <option value="">انتخاب کارمند</option>
-                {Array.isArray(staffs) &&
-                  staffs.map(staff => (
-                    <option key={staff.id} value={staff.id}>
-                      {staff.name} - {staff.fatherName}
-                    </option>
-                  ))}
-              </select>
-            </div>
+        {showForm && (
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="p-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Staff Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="text-red-500">*</span> انتخاب کارمند
+                  </label>
+                  <select
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                    value={form.staffId}
+                    onChange={e => setForm({ ...form, staffId: e.target.value })}
+                    required
+                  >
+                    <option value="">انتخاب کارمند</option>
+                    {Array.isArray(staffs) &&
+                      staffs.map(staff => (
+                        <option key={staff.id} value={staff.id}>
+                          {staff.name} - {staff.fatherName}
+                        </option>
+                      ))}
+                  </select>
+                </div>
 
-            {/* Attendance Days Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {daysOrder.map(day => (
-                <div key={day} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-gray-700">{persianDays[day]}</h3>
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="hidden peer"
-                          checked={form.attendance[day].attendance}
-                          onChange={e =>
-                            handleAttendanceChange(day, "attendance", e.target.checked)
-                          }
-                        />
-                        <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${form.attendance[day].attendance ? 'bg-green-500' : 'bg-gray-300'}`}>
-                          <div className={`bg-white w-4 h-4 rounded-full shadow transform transition-transform ${form.attendance[day].attendance ? 'translate-x-4' : ''}`} />
+                {/* Attendance Days Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {daysOrder.map(day => (
+                    <div key={day} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold text-gray-700">{persianDays[day]}</h3>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="hidden peer"
+                              checked={form.attendance[day].attendance}
+                              onChange={e =>
+                                handleAttendanceChange(day, "attendance", e.target.checked)
+                              }
+                            />
+                            <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${form.attendance[day].attendance ? 'bg-green-500' : 'bg-gray-300'}`}>
+                              <div className={`bg-white w-4 h-4 rounded-full shadow transform transition-transform ${form.attendance[day].attendance ? 'translate-x-4' : ''}`} />
+                            </div>
+                            <span className="text-sm text-gray-600">
+                              {form.attendance[day].attendance ? <FaCheck className="text-green-500" /> : <FaTimes className="text-gray-400" />}
+                            </span>
+                          </label>
                         </div>
-                        <span className="text-sm text-gray-600">
-                          {form.attendance[day].attendance ? <FaCheck className="text-green-500" /> : <FaTimes className="text-gray-400" />}
-                        </span>
-                      </label>
-                    </div>
-                  </div>
+                      </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      اضافه‌کاری (ساعت)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                        value={form.attendance[day].overtime}
-                        onChange={e =>
-                          handleAttendanceChange(day, "overtime", e.target.value)
-                        }
-                        disabled={!form.attendance[day].attendance}
-                      />
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                        ساعت
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          اضافه‌کاری (ساعت)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                            value={form.attendance[day].overtime}
+                            onChange={e =>
+                              handleAttendanceChange(day, "overtime", e.target.value)
+                            }
+                            disabled={!form.attendance[day].attendance}
+                          />
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                            ساعت
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 pt-4 border-t border-gray-200">
+
+                  {/* Total & Receipt Section */}
+                  {editingId && (
+                    <div className="flex flex-col md:flex-row gap-4 flex-1">
+
+                      {/* Total Display */}
+                      <div className="bg-gray-100 p-4 rounded-lg flex flex-col justify-center items-start">
+                        <label className="text-sm font-medium text-gray-700 mb-1">مجموع کل</label>
+                        <span className="text-lg font-bold text-emerald-700">
+                          {records.find(r => r.id === editingId)?.total || 0} ؋
+                        </span>
+                      </div>
+
+                      {/* Receipt Input */}
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          مبلغ پرداخت شده (Receipt)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={records.find(r => r.id === editingId)?.total || undefined}
+                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                          value={form.receipt}
+                          onChange={e =>
+                            setForm({ ...form, receipt: Number(e.target.value) })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    {editingId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm(initialForm);
+                          setEditingId(null);
+                        }}
+                        className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                      >
+                        لغو ویرایش
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className={`px-6 py-3 rounded-lg font-medium shadow-md transition flex items-center gap-2
+    ${submitting
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-gradient-to-r from-cyan-800 to-cyan-600 hover:from-cyan-900 hover:to-cyan-700 text-white"
+                        }`}
+                    >
+                      {submitting ? (
+                        <>
+                          <svg
+                            className="animate-spin h-5 w-5 text-white"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                            />
+                          </svg>
+                          در حال ذخیره...
+                        </>
+                      ) : (
+                        <>
+                          <FaCheck />
+                          {editingId ? "ذخیره تغییرات" : "ثبت حضور و غیاب"}
+                        </>
+                      )}
+                    </button>
+
                   </div>
                 </div>
-              ))}
+
+              </form>
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 pt-4 border-t border-gray-200">
-
-              {/* Total & Receipt Section */}
-              {editingId && (
-                <div className="flex flex-col md:flex-row gap-4 flex-1">
-
-                  {/* Total Display */}
-                  <div className="bg-gray-100 p-4 rounded-lg flex flex-col justify-center items-start">
-                    <label className="text-sm font-medium text-gray-700 mb-1">مجموع کل</label>
-                    <span className="text-lg font-bold text-emerald-700">
-                      {records.find(r => r.id === editingId)?.total || 0} ؋
-                    </span>
-                  </div>
-
-                  {/* Receipt Input */}
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      مبلغ پرداخت شده (Receipt)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={records.find(r => r.id === editingId)?.total || undefined}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
-                      value={form.receipt}
-                      onChange={e =>
-                        setForm({ ...form, receipt: Number(e.target.value) })
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                {editingId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForm(initialForm);
-                      setEditingId(null);
-                    }}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-                  >
-                    لغو ویرایش
-                  </button>
-                )}
-
-                <button
-                  type="submit"
-                  className="px-6 py-3 bg-gradient-to-r from-cyan-800 to-cyan-600 text-white rounded-lg hover:from-blue-900 hover:to-blue-700 transition font-medium shadow-md"
-                >
-                  <div className="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <span>{editingId ? "ذخیره تغییرات" : "ثبت حضور و غیاب"}</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-          </form>
-        </div>
+          </div>)}
       </div>
 
       {/* Records Table */}
@@ -331,11 +385,8 @@ const SalaryManagement = () => {
                 <tr>
                   <td colSpan="8" className="p-8">
                     <div className="flex flex-col items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+                      
                       <p className="text-gray-500 text-lg">هیچ رکوردی ثبت نشده است</p>
-                      <p className="text-gray-400 text-sm mt-1">برای شروع، حضور و غیاب جدیدی ثبت کنید</p>
                     </div>
                   </td>
                 </tr>
@@ -349,7 +400,7 @@ const SalaryManagement = () => {
                       key={record.id}
                       className="hover:bg-gray-50 border-b last:border-0 transition-colors"
                     >
-                      <td className="p-3 text-gray-600">{index + 1}</td>
+                      <td className="p-3 text-gray-600">{record.id}</td>
                       <td className="p-3">
                         <div className="text-right">
                           <div className="font-medium text-gray-800">{record.Staff?.name}</div>
@@ -402,13 +453,13 @@ const SalaryManagement = () => {
                           >
                             <FaEdit />
                           </button>
-                          <button
+                          {currentUser.role == "admin" && (<button
                             onClick={() => handleDelete(record.id)}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
                             title="حذف"
                           >
                             <FaTrash />
-                          </button>
+                          </button>)}
                         </div>
                       </td>
                     </tr>

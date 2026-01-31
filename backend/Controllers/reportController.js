@@ -4,7 +4,7 @@ import Owner from "../Models/owners.js";
 import Money from "../Models/Money.js";
 import Customer from "../Models/Customers.js";
 import OrderItem from "../Models/OrderItems.js";
-import Receipt from "../Models/receipt.js";
+import Receipt from "../Models/Receipt.js";
 import Remain from "../Models/Remain.js";
 import Expense from "../Models/Expense.js";
 import Staff from "../Models/staff/staff.js";
@@ -12,7 +12,7 @@ import Attendance from "../Models/Attendence.js";
 import Exist from "../Models/Stock/exist.js";
 import Income from "../Models/Stock/income.js";
 import Outgoing from "../Models/Stock/outgoing.js";
-import User from "../Models/User.js";
+import User from "../Models/user.js";
 
 /**
  * Generate Complete System Report

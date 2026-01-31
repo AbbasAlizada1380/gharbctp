@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { useSelector } from "react-redux";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 export default function MoneyManager() {
   const [moneyList, setMoneyList] = useState([]);
   const [owners, setOwners] = useState([]);
+  const { currentUser } = useSelector((state) => state.user);
   const [ownerId, setOwnerId] = useState("");
   const [amount, setAmount] = useState("");
   const [calculated, setCalculated] = useState(false);
@@ -30,7 +33,7 @@ export default function MoneyManager() {
     const params = new URLSearchParams();
     if (filters.calculated !== "") params.append("calculated", filters.calculated);
     if (filters.ownerId) params.append("ownerId", filters.ownerId);
-    
+
     const url = `${BASE_URL}/money${params.toString() ? `?${params.toString()}` : ''}`;
     const res = await axios.get(url);
     setMoneyList(res.data.moneyList);
@@ -40,7 +43,7 @@ export default function MoneyManager() {
   const fetchSummary = async () => {
     const params = new URLSearchParams();
     if (filters.ownerId) params.append("ownerId", filters.ownerId);
-    
+
     const url = `${BASE_URL}/money/summary${params.toString() ? `?${params.toString()}` : ''}`;
     const res = await axios.get(url);
     setSummary(res.data.summary);
@@ -52,9 +55,9 @@ export default function MoneyManager() {
     fetchSummary();
   }, [filters]);
 
-  // 🔹 Create / Update money
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // ⛔ جلوگیری از کلیک چندباره
     if (!ownerId || amount === "") return;
 
     setLoading(true);
@@ -83,6 +86,7 @@ export default function MoneyManager() {
     }
   };
 
+
   const resetForm = () => {
     setOwnerId("");
     setAmount("");
@@ -110,23 +114,6 @@ export default function MoneyManager() {
       alert(err.response?.data?.message || "خطا در حذف تراکنش");
     }
   };
-
-  // 🔹 Handle filter changes
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  // 🔹 Clear filters
-  const clearFilters = () => {
-    setFilters({
-      calculated: "",
-      ownerId: ""
-    });
-  };
-
   // 🔹 Get owner name by ID
   const getOwnerName = (ownerId) => {
     const owner = owners.find(o => o.id == ownerId);
@@ -137,12 +124,35 @@ export default function MoneyManager() {
 
   return (
     <div className="space-y-6" dir="rtl">
-     
+
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-gray-800">مدیریت تراکنش‌ها</h2>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-lg hover:from-cyan-700 hover:to-cyan-600 transition-all flex items-center gap-2"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            افزودن تراکنش
+          </button>
+        </div>
+      </div>
 
       {/* Summary Panel */}
       {showSummary && summary && (
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-lg p-6 animate-fadeIn">
-          
+
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
@@ -264,57 +274,56 @@ export default function MoneyManager() {
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  نوع تراکنش
-                </label>
-                <div className="flex items-center gap-4 mt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={!calculated}
-                      onChange={() => setCalculated(false)}
-                      className="w-4 h-4 text-cyan-600"
-                    />
-                    <span className="text-gray-700">تصفیه نشده</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={calculated}
-                      onChange={() => setCalculated(true)}
-                      className="w-4 h-4 text-cyan-600"
-                    />
-                    <span className="text-gray-700">تصفیه شده</span>
-                  </label>
-                </div>
-              </div>
             </div>
 
             <div className="flex gap-3 pt-4">
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-medium rounded-lg hover:from-cyan-700 hover:to-cyan-600 transition-all disabled:opacity-50 flex items-center gap-2"
+                className={`px-6 py-3 font-medium rounded-lg transition-all flex items-center gap-2
+    ${loading
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600 text-white"
+                  }`}
               >
                 {loading ? (
                   <>
-                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
                     </svg>
-                    در حال پردازش...
+                    در حال ذخیره...
                   </>
                 ) : (
                   <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
                     {editingId ? "به‌روزرسانی تراکنش" : "افزودن تراکنش"}
                   </>
                 )}
               </button>
+
 
               {(editingId || showForm) && (
                 <button
@@ -352,7 +361,6 @@ export default function MoneyManager() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-right py-4 px-6 font-semibold text-gray-700">مالک</th>
                 <th className="text-right py-4 px-6 font-semibold text-gray-700">مبلغ</th>
-                <th className="text-right py-4 px-6 font-semibold text-gray-700">نوع</th>
                 <th className="text-right py-4 px-6 font-semibold text-gray-700">تاریخ</th>
                 <th className="text-right py-4 px-6 font-semibold text-gray-700">عملیات</th>
               </tr>
@@ -362,18 +370,15 @@ export default function MoneyManager() {
               {moneyList.map((item) => (
                 <tr
                   key={item.id}
-                  className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                    item.calculated ? 'bg-blue-50/50' : ''
-                  }`}
+                  className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${item.calculated ? 'bg-blue-50/50' : ''
+                    }`}
                 >
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                        item.calculated ? 'bg-blue-100' : 'bg-cyan-100'
-                      }`}>
-                        <span className={`font-semibold ${
-                          item.calculated ? 'text-blue-600' : 'text-cyan-600'
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.calculated ? 'bg-blue-100' : 'bg-cyan-100'
                         }`}>
+                        <span className={`font-semibold ${item.calculated ? 'text-blue-600' : 'text-cyan-600'
+                          }`}>
                           {item.owner?.name?.charAt(0) || "O"}
                         </span>
                       </div>
@@ -391,32 +396,10 @@ export default function MoneyManager() {
                       <span className="text-xs text-gray-500">افغانی</span>
                     </div>
                   </td>
-                  <td className="py-4 px-6">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-                      item.calculated 
-                        ? 'bg-blue-100 text-blue-700' 
-                        : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {item.calculated ? (
-                        <>
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                          </svg>
-                       تصفیه شده
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                          </svg>
-                          تصفیه نشده
-                        </>
-                      )}
-                    </span>
-                  </td>
+
                   <td className="py-4 px-6">
                     <div className="text-gray-600" dir="rtl">
-                      {new Date(item.createdAt).toLocaleDateString('fa-IR-u-nu-latn', {
+                      {new Date(item.createdAt).toLocaleDateString('eng-en', {
                         year: 'numeric',
                         month: 'numeric',
                         day: 'numeric'
@@ -430,27 +413,24 @@ export default function MoneyManager() {
                     </div>
                   </td>
                   <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="p-2 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 text-red-700 rounded-lg hover:from-red-100 hover:to-red-200 transition-all"
-                        title="حذف"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                      </button>
+                    {currentUser.role == "admin" ? (<div className="flex items-center gap-2">
 
                       <button
                         onClick={() => handleEdit(item)}
-                        className="p-2 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all"
+                        className="p-2 text-cyan-700 hover:from-yellow-100 hover:to-yellow-200 transition-all"
                         title="ویرایش"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                        </svg>
+                        <FaEdit />
                       </button>
-                    </div>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="text-red-500"
+                        title="حذف"
+                      >
+                        <FaTrash />
+                      </button>
+
+                    </div>) : "--"}
                   </td>
                 </tr>
               ))}

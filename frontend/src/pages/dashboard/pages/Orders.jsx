@@ -22,7 +22,7 @@ const Orders = () => {
   const [loading, setLoading] = useState(false);
   const [addingCustomer, setAddingCustomer] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Add this state
-
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     customer: "",
     newCustomerName: "",
@@ -102,7 +102,10 @@ const Orders = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Filter out completely empty order items
+    // ⛔ اگر قبلاً کلیک شده، هیچ کاری نکن
+    if (submitting) return;
+
+    // Filter out empty items
     const nonEmptyOrderItems = form.orderItems.filter(item =>
       item.size.trim() !== "" ||
       item.qnty !== "" ||
@@ -110,7 +113,6 @@ const Orders = () => {
       item.fileName.trim() !== ""
     );
 
-    // If no valid items, show error
     if (nonEmptyOrderItems.length === 0) {
       alert("لطفا حداقل یک مورد سفارش را پر کنید");
       return;
@@ -123,32 +125,34 @@ const Orders = () => {
     };
 
     try {
-      console.log("Submitting payload:", payload);
+      setSubmitting(true); // 🔒 قفل دکمه
 
       await axios.post(`${BASE_URL}/orderItems`, payload);
+
       alert("سفارش موفقانه ثبت شد");
 
-      // Reset form but keep 5 empty items
       setForm({
         customer: "",
         newCustomerName: "",
         orderItems: createEmptyOrderItems(5),
       });
+
       setAddingCustomer(false);
-      
-      // TRIGGER REFRESH HERE - Increment the refresh trigger
       setRefreshTrigger(prev => prev + 1);
-      
+
     } catch (err) {
       console.error(err);
       alert("خطا در ثبت سفارش");
+    } finally {
+      setSubmitting(false); // 🔓 آزاد شدن (اگر خواستی)
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="mx-auto bg-white rounded-xl shadow p-6 space-y-6">
-        <div className="felx"> 
+        <div className="felx">
           <h2 className="text-xl font-bold text-cyan-800 mb-6">ثبت سفارش جدید</h2>
 
           {/* Customer Select / Add */}
@@ -224,15 +228,26 @@ const Orders = () => {
           </button>
         </div>
 
-        {/* Submit */}
         <button
           onClick={handleSubmit}
-          className="w-full bg-cyan-800 text-white py-3 rounded-md hover:bg-cyan-900 transition"
+          disabled={submitting}
+          className={`
+    w-full py-3 rounded-md transition
+    ${submitting
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-cyan-800 text-white hover:bg-cyan-900"}
+  `}
         >
-          ثبت سفارش ({form.orderItems.filter(item => item.size || item.qnty || item.price || item.fileName).length} مورد پر شده)
+          {submitting
+            ? "در حال ثبت سفارش..."
+            : `ثبت سفارش (${form.orderItems.filter(
+              item => item.size || item.qnty || item.price || item.fileName
+            ).length} مورد پر شده)`
+          }
         </button>
+
       </div>
-      
+
       {/* Pass the refreshTrigger prop */}
       <OrderItemsList refreshTrigger={refreshTrigger} />
     </div>

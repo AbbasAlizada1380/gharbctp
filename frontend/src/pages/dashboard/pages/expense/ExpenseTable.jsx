@@ -1,3 +1,4 @@
+import { useSelector } from "react-redux";
 import Pagination from "../../pagination/Pagination";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
@@ -10,6 +11,8 @@ const ExpenseTable = ({
   onEdit,
   onDelete,
 }) => {
+
+  const { currentUser } = useSelector((state) => state.user);
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
       {/* Table Header */}
@@ -40,6 +43,7 @@ const ExpenseTable = ({
               <th className="p-3 border-b font-semibold">پرداخت کننده</th>
               <th className="p-3 border-b font-semibold">مبلغ (افغانی)</th>
               <th className="p-3 border-b font-semibold">توضیحات</th>
+              <th className="p-3 border-b font-semibold">تاریخ ثبت</th>
               <th className="p-3 border-b font-semibold">عملیات</th>
             </tr>
           </thead>
@@ -60,7 +64,7 @@ const ExpenseTable = ({
                   className="hover:bg-gray-50 border-b last:border-0 transition-colors"
                 >
                   <td className="p-3 text-gray-600">
-                    {(currentPage - 1) * 10 + index + 1}
+                    {e.id}
                   </td>
                   <td className="p-3 font-medium text-gray-800">
                     <div className="max-w-xs mx-auto truncate">
@@ -92,26 +96,29 @@ const ExpenseTable = ({
                     </div>
                   </td>
                   <td className="p-3">
-                    <div className="flex items-center justify-center gap-2">
+                    {e.createdAt ?
+                      new Date(e.createdAt)
+                        .toLocaleDateString('eng-en')
+                        .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+                      : '—'
+                    }
+                  </td>
+                  <td className="p-3">
+                    {currentUser.role == "admin" ? (<div className="flex items-center justify-center gap-2">
                       <button
                         onClick={() => onEdit(e)}
                         className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg transition"
                         title="ویرایش"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                        </svg>
+                        <FaEdit />
                       </button>
                       <button
                         onClick={() => onDelete(e.id)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
                         title="حذف"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
+                      ><FaTrash/>
                       </button>
-                    </div>
+                    </div>) : "--"}
                   </td>
                 </tr>
               ))

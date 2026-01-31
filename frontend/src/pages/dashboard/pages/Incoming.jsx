@@ -307,7 +307,9 @@ const Incoming = () => {
                     className={`w-full border rounded-md p-2 focus:ring-2 focus:ring-cyan-300 ${isEmpty ? 'border-dashed' : ''}`}
                     placeholder="0"
                     min="0"
-                    step="0.001"
+                    step="1"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                   />
                 </div>
 
@@ -433,7 +435,6 @@ const Incoming = () => {
                     <th className="p-3 border-b font-semibold">مصرف شده</th>
                     <th className="p-3 border-b font-semibold">موجودی</th>
                     <th className="p-3 border-b font-semibold">تاریخ</th>
-                    <th className="p-3 border-b font-semibold">عملیات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -445,7 +446,7 @@ const Incoming = () => {
                         className="hover:bg-gray-50 border-b last:border-0 transition-colors"
                       >
                         <td className="p-3 text-gray-600">
-                          {(currentPage - 1) * perPage + index + 1}
+                          {income.id}
                         </td>
                         <td className="p-3">
                           <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
@@ -470,8 +471,8 @@ const Incoming = () => {
                         </td>
                         <td className="p-3">
                           <span className={`px-2 py-1 rounded-full text-sm font-medium ${remaining > 0
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-gray-100 text-gray-500'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-500'
                             }`}>
                             {remaining > 0 ? remaining : 0}
                           </span>
@@ -479,32 +480,10 @@ const Incoming = () => {
                         <td className="p-3 text-gray-500 text-sm">
                           {income.createdAt ?
                             new Date(income.createdAt)
-                              .toLocaleDateString('fa-IR')
+                              .toLocaleDateString('eng-en')
                               .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
                             : '—'
                           }
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => fetchIncomeById(income.id)}
-                              className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg"
-                              title="ویرایش"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => deleteIncome(income.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                              title="حذف"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          </div>
                         </td>
                       </tr>
                     );
@@ -512,13 +491,13 @@ const Incoming = () => {
                 </tbody>
               </table>
             </div>
-              <div className="p-6 border-t border-gray-200">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                />
-              </div>
+            <div className="p-6 border-t border-gray-200">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
           </>
         )}
       </div>

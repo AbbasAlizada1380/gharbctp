@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import ExpenseTable from "./ExpenseTable";
+import { useSelector } from "react-redux";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const limit = 10;
 
 const ExpenseManager = () => {
     const [expenses, setExpenses] = useState([]);
+    const { currentUser } = useSelector((state) => state.user);
     const [loading, setLoading] = useState(false);
-
+    const [submitting, setSubmitting] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
-
     const [editingId, setEditingId] = useState(null);
-
     const [form, setForm] = useState({
         purpose: "",
         by: "",
@@ -42,23 +42,26 @@ const ExpenseManager = () => {
         fetchExpenses(currentPage);
     }, [currentPage]);
 
-    /* ======================
-       Handle Submit (Create / Update)
-    ====================== */
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (submitting) return;
 
         try {
+            setSubmitting(true);
+
             if (editingId) {
                 await axios.put(`${BASE_URL}/expense/${editingId}`, form);
             } else {
                 await axios.post(`${BASE_URL}/expense`, form);
             }
+
             resetForm();
             fetchExpenses(currentPage);
         } catch (err) {
             console.error(err);
             alert(err.response?.data?.message || "Error saving expense");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -221,21 +224,55 @@ const ExpenseManager = () => {
                             )}
                             <button
                                 type="submit"
-                                className="px-6 py-3 bg-gradient-to-r from-cyan-800 to-cyan-600 text-white rounded-lg hover:from-cyan-900 hover:to-cyan-700 transition font-medium shadow-md"
+                                disabled={submitting}
+                                className={`px-6 py-3 rounded-lg font-medium shadow-md transition
+        ${submitting
+                                        ? "bg-gray-400 cursor-not-allowed"
+                                        : "bg-gradient-to-r from-cyan-800 to-cyan-600 hover:from-cyan-900 hover:to-cyan-700 text-white"
+                                    }`}
                             >
                                 <div className="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                    <span>{editingId ? "ذخیره تغییرات" : "ثبت هزینه"}</span>
+                                    {submitting ? (
+                                        <>
+                                            <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                    fill="none"
+                                                />
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                                                />
+                                            </svg>
+                                            <span>در حال ذخیره...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path
+                                                    fillRule="evenodd"
+                                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                    clipRule="evenodd"
+                                                />
+                                            </svg>
+                                            <span>{editingId ? "ذخیره تغییرات" : "ثبت هزینه"}</span>
+                                        </>
+                                    )}
                                 </div>
                             </button>
+
                         </div>
                     </form>
                 </div>
             </div>
 
-            
+
 
             {/* Expense Table */}
             <ExpenseTable

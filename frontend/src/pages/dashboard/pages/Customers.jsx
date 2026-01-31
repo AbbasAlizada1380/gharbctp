@@ -3,17 +3,19 @@ import axios from "axios";
 import Pagination from "../pagination/Pagination";
 import RemainOrderItems from "./RemainOrderItems"; // adjust path if needed
 import { FaUsers, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
+import { useSelector } from "react-redux";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const limit = 20;
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
+  const { currentUser } = useSelector((state) => state.user);
   const [loading, setLoading] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
+  const [submitting, setSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -47,13 +49,13 @@ const Customers = () => {
     fetchCustomers(currentPage);
   }, [currentPage]);
 
-  /* ======================
-     Create / Update
-  ====================== */
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
 
     try {
+      setSubmitting(true);
+
       if (editingId) {
         await axios.put(`${BASE_URL}/customers/${editingId}`, form);
       } else {
@@ -64,8 +66,11 @@ const Customers = () => {
       fetchCustomers(currentPage);
     } catch (err) {
       console.error(err);
+    } finally {
+      setSubmitting(false);
     }
   };
+
 
   /* ======================
      Edit
@@ -173,26 +178,20 @@ const Customers = () => {
                     onClick={() => setSelectedCustomer(c)} // <-- select customer
                   >
                     <td className="border px-4 py-2">
-                      {(currentPage - 1) * limit + index + 1}
+                      {c.id}
                     </td>
                     <td className="border px-4 py-2">{c.fullname}</td>
                     <td className="border px-4 py-2">{c.phoneNumber}</td>
                     <td className="border px-4 py-2">{c.isActive ? "فعال" : "غیرفعال"}</td>
                     <td className="border px-4 py-2">
-                      <div className="flex justify-center gap-2">
+                     {currentUser.role=="admin"?( <div className="flex justify-center gap-2">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
                           className="h-8 w-8 flex items-center justify-center border border-cyan-800 rounded-md hover:scale-105"
                         >
                           <FaEdit className="text-cyan-800" />
                         </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
-                          className="h-8 w-8 flex items-center justify-center border border-red-600 rounded-md hover:scale-105"
-                        >
-                          <FaTrash className="text-red-600" />
-                        </button>
-                      </div>
+                      </div>):"--"}
                     </td>
                   </tr>
                 ))
@@ -266,10 +265,16 @@ const Customers = () => {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-cyan-800 text-white rounded"
+                disabled={submitting}
+                className="
+    px-4 py-2 bg-cyan-800 text-white rounded
+    flex items-center justify-center gap-2
+    disabled:opacity-60 disabled:cursor-not-allowed
+  "
               >
-                ذخیره
+                {submitting ? "در حال ذخیره..." : "ذخیره"}
               </button>
+
             </div>
           </form>
         </div>

@@ -1,8 +1,8 @@
 import { DataTypes } from "sequelize";
-import sequelize from "../../dbconnection.js";
+import sequelize from "../dbconnection.js";
 
-const Outgoing = sequelize.define(
-  "Outgoing",
+const CompanyStock = sequelize.define(
+  "CompanyStock",
   {
     size: {
       type: DataTypes.STRING,
@@ -12,9 +12,6 @@ const Outgoing = sequelize.define(
       type: DataTypes.STRING,
     },
     money: {
-      type: DataTypes.STRING,
-    },
-    receipt: {
       type: DataTypes.INTEGER,
     }
   },
@@ -23,5 +20,5 @@ const Outgoing = sequelize.define(
   }
 );
 
-export default Outgoing;
+export default CompanyStock;
 ;

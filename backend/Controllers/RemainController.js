@@ -243,3 +243,74 @@ export const deleteRemain = async (req, res) => {
     });
   }
 };
+    
+/**
+ * GET remaining money of all customers
+ * GET /remain/money
+ */
+export const getRemainingMoneyOfAllCustomers = async (req, res) => {
+  try {
+    // 1️⃣ get all remain records with customer
+    const remains = await Remain.findAll({
+      include: [{ model: Customer, as: "customer" }],
+      order: [["id", "DESC"]],
+    });
+
+    if (!remains.length) {
+      return res.json({
+        customers: [],
+        grandTotalRemaining: 0,
+      });
+    }
+
+    const results = [];
+    let grandTotalRemaining = 0;
+
+    // 2️⃣ loop through each remain record
+    for (const remain of remains) {
+      const orderIds = remain.orderId || [];
+
+      if (!orderIds.length) continue;
+
+      // 3️⃣ fetch related order items
+      const orderItems = await OrderItem.findAll({
+        where: { id: orderIds },
+        attributes: ["money", "receipt"],
+      });
+
+      let totalMoney = 0;
+      let totalReceipt = 0;
+
+      orderItems.forEach((item) => {
+        totalMoney += Number(item.money || 0);
+        totalReceipt += Number(item.receipt || 0);
+      });
+
+      const remainingMoney = totalMoney - totalReceipt;
+
+      if (remainingMoney > 0) {
+        results.push({
+          customer: remain.customer,
+          orderCount: orderItems.length,
+          totalMoney,
+          totalReceipt,
+          remainingMoney,
+        });
+
+        grandTotalRemaining += remainingMoney;
+      }
+    }
+
+    res.json({
+      customers: results,
+      customerCount: results.length,
+      grandTotalRemaining,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Error calculating remaining money for all customers",
+      error: error.message,
+    });
+  }
+};

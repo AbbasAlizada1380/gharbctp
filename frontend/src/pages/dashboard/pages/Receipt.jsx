@@ -147,9 +147,10 @@ const ReceiptManager = () => {
     }));
   };
 
-  /* ---------------- SUBMIT ---------------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return; // ⛔ جلوگیری از submit دوباره
+
     setLoading(true);
     setError("");
 
@@ -157,7 +158,7 @@ const ReceiptManager = () => {
       const payload = {
         customer: form.customer,
         amount: parseFloat(form.amount),
-        calculated: form.calculated // Include calculated field
+        calculated: form.calculated,
       };
 
       if (editingId) {
@@ -172,7 +173,6 @@ const ReceiptManager = () => {
       fetchReceipts();
 
       alert(editingId ? "رسید با موفقیت ویرایش شد" : "رسید با موفقیت ثبت شد");
-
     } catch (error) {
       console.error("Error saving receipt", error);
       setError(error.response?.data?.message || "خطا در ذخیره رسید");
@@ -181,16 +181,7 @@ const ReceiptManager = () => {
     }
   };
 
-  /* ---------------- EDIT ---------------- */
-  const handleEdit = (receipt) => {
-    setForm({
-      customer: receipt.customer.toString(),
-      amount: receipt.amount.toString(),
-      calculated: receipt.calculated || false, // Set calculated value
-    });
-    setEditingId(receipt.id);
-    setOriginalReceipt(receipt);
-  };
+
 
   /* ---------------- CANCEL EDIT ---------------- */
   const cancelEdit = () => {
@@ -210,41 +201,9 @@ const ReceiptManager = () => {
     }
   };
 
-  /* ---------------- DELETE ---------------- */
-  const handleDelete = async (id) => {
-    if (!confirm("آیا از حذف این رسید اطمینان دارید؟")) return;
 
-    try {
-      await axios.delete(`${BASE_URL}/receipts/${id}`);
-      fetchReceipts();
-      alert("رسید با موفقیت حذف شد");
-    } catch (error) {
-      console.error("Delete error", error);
-      alert(error.response?.data?.message || "خطا در حذف رسید");
-    }
-  };
 
-  /* ---------------- BULK UPDATE CALCULATED ---------------- */
-  const handleBulkUpdateCalculated = async (receiptIds, newCalculated) => {
-    if (!confirm(`آیا می‌خواهید وضعیت ${receiptIds.length} رسید را تغییر دهید؟`)) return;
 
-    try {
-      await axios.patch(`${BASE_URL}/receipts/bulk-calculated`, {
-        ids: receiptIds,
-        calculated: newCalculated
-      });
-      fetchReceipts();
-      alert(`وضعیت ${receiptIds.length} رسید با موفقیت تغییر یافت`);
-    } catch (error) {
-      console.error("Bulk update error", error);
-      alert(error.response?.data?.message || "خطا در بروزرسانی دسته‌ای");
-    }
-  };
-
-  /* ---------------- APPLY FILTERS ---------------- */
-  const applyFilters = () => {
-    setCurrentPage(1); // Reset to first page when applying filters
-  };
 
   /* ---------------- CLEAR FILTERS ---------------- */
   const clearFilters = () => {
@@ -272,7 +231,7 @@ const ReceiptManager = () => {
   // Format date
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    const formatted = date.toLocaleDateString("fa-IR");
+    const formatted = date.toLocaleDateString("eng-en");
     return formatted.replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
   };
 
@@ -409,41 +368,6 @@ const ReceiptManager = () => {
               </div>
             </div>
 
-            {/* Calculated Field */}
-            {editingId&&  <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                نوع رسید
-              </label>
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="calculated"
-                    checked={!form.calculated}
-                    onChange={() => setForm(prev => ({ ...prev, calculated: false }))}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <div className="flex items-center gap-2">
-                    <FaPen className="text-gray-600" />
-                    <span className="text-gray-700">تصفیه نشده</span>
-                  </div>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="calculated"
-                    checked={form.calculated}
-                    onChange={() => setForm(prev => ({ ...prev, calculated: true }))}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <div className="flex items-center gap-2">
-                    <FaCalculator className="text-green-600" />
-                    <span className="text-gray-700">تصفیه شده</span>
-                  </div>
-                </label>
-              </div>
-            </div>}
-
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
               {editingId && (
@@ -475,7 +399,13 @@ const ReceiptManager = () => {
               <button
                 type="submit"
                 disabled={loading || !hasChanges()}
-                className="px-6 py-3 bg-gradient-to-r from-cyan-800 to-cyan-600 text-white rounded-lg hover:from-blue-900 hover:to-blue-700 transition font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                className="
+    px-6 py-3
+    bg-gradient-to-r from-cyan-800 to-cyan-600
+    text-white rounded-lg
+    transition font-medium shadow-md
+    disabled:opacity-50 disabled:cursor-not-allowed
+  "
               >
                 <div className="flex items-center gap-2">
                   {loading ? (
@@ -485,17 +415,17 @@ const ReceiptManager = () => {
                   ) : (
                     <FaPlus />
                   )}
-                  <span>{loading ? "در حال پردازش..." : editingId ? "ذخیره تغییرات" : "ثبت رسید"}</span>
+                  <span>
+                    {loading
+                      ? "در حال پردازش..."
+                      : editingId
+                        ? "ذخیره تغییرات"
+                        : "ثبت رسید"}
+                  </span>
                 </div>
               </button>
-            </div>
 
-            {/* Error Message */}
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-600 text-center">{error}</p>
-              </div>
-            )}
+            </div>
           </form>
         </div>
       </div>
@@ -527,7 +457,6 @@ const ReceiptManager = () => {
                 <th className="p-3 border-b font-semibold">#</th>
                 <th className="p-3 border-b font-semibold">مشتری</th>
                 <th className="p-3 border-b font-semibold">مبلغ (افغانی)</th>
-                <th className="p-3 border-b font-semibold">نوع</th>
                 <th className="p-3 border-b font-semibold">تاریخ ثبت</th>
                 <th className="p-3 border-b font-semibold">عملیات</th>
               </tr>
@@ -547,49 +476,50 @@ const ReceiptManager = () => {
                 receipts.map((receipt, index) => (
                   <tr
                     key={receipt.id}
-                    className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${editingId === receipt.id ? "bg-yellow-50" : ""
-                      } ${receipt.calculated ? 'bg-blue-50/50' : ''}`}
+                    className={`
+    border-b last:border-0 transition-colors
+    hover:bg-gray-50
+    ${editingId === receipt.id ? "bg-yellow-50" : ""}
+    ${receipt.calculated ? "bg-blue-50/40" : ""}
+  `}
                   >
-                    <td className="p-3 text-gray-600">{receipt.id}</td>
+                    {/* ID */}
+                    <td className="p-3 text-gray-600 font-medium">
+                      {receipt.id}
+                    </td>
+
+                    {/* Customer */}
                     <td className="p-3">
-                      <div className="text-right">
-                        <div className="font-medium text-gray-800">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-gray-800">
                           {getCustomerName(receipt.customer)}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
+                        </span>
+                        <span className="text-xs text-gray-500">
                           کد: {receipt.customer}
-                        </div>
+                        </span>
                       </div>
                     </td>
+
+                    {/* Amount */}
                     <td className="p-3">
-                      <span className={`px-3 py-1 rounded-full text-sm font-bold ${receipt.calculated
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-green-100 text-green-800'
-                        }`}>
-                        {parseFloat(receipt.amount || 0).toLocaleString('en-US')}
+                      <span
+                        className={`
+        inline-block px-3 py-1 rounded-full text-sm font-bold
+        ${receipt.calculated
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-green-100 text-green-800"}
+      `}
+                      >
+                        {Number(receipt.amount || 0).toLocaleString("en-US")}
                       </span>
                     </td>
-                    <td className="p-3">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${receipt.calculated
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-700'
-                        }`}>
-                        {receipt.calculated ? (
-                          <>
-                            <FaCalculator className="w-3 h-3" />
-                            تصفیه شده
-                          </>
-                        ) : (
-                          <>
-                            <FaPen className="w-3 h-3" />
-                            تصفیه نشده
-                          </>
-                        )}
-                      </span>
-                    </td>
-                    <td className="p-3 text-gray-500 text-sm">
+
+                    {/* Date */}
+                    <td className="p-3 text-gray-500 text-sm whitespace-nowrap">
                       {formatDate(receipt.createdAt)}
                     </td>
+
+                    {/* Actions */}
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -600,29 +530,10 @@ const ReceiptManager = () => {
                         >
                           <FaPrint />
                         </button>
-
-                        {/* <button
-                          onClick={() => handleEdit(receipt)}
-                          className={`p-2 rounded-lg transition ${editingId === receipt.id
-                            ? "bg-cyan-700 text-white"
-                            : "text-cyan-700 hover:bg-cyan-50"
-                            }`}
-                          title="ویرایش"
-                          disabled={editingId !== null && editingId !== receipt.id}
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(receipt.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="حذف"
-                          disabled={editingId !== null}
-                        >
-                          <FaTrash />
-                        </button> */}
                       </div>
                     </td>
                   </tr>
+
                 ))
               )}
             </tbody>

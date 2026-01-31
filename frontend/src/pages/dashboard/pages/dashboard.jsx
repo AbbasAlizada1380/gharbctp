@@ -2,6 +2,7 @@ import React from "react";
 import FinancialReports from "./report/FinancialReports"; // Adjust the import path as needed
 import DashboardHome from "./report/DashboardHome";
 import AnalyticsDashboard from "./report/AnalyticsDashboard";
+import CompanyStock from "./CompanyStock";
 
 const Dashboard = () => {
   return (
@@ -14,7 +15,7 @@ const Dashboard = () => {
       {/* Render the FinancialReports component */}
       <div className="mt-6">
         <DashboardHome />
-        {/* <AnalyticsDashboard /> */}
+        <CompanyStock/>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import OrderItem from "../Models/OrderItems.js";
 import Customer from "../Models/Customers.js";
 import Remain from "../Models/Remain.js";
 import sequelize from "../dbconnection.js";
+import CompanyStock from "../Models/CompanyStock.js";
 import { Op } from "sequelize";
 
 export const createOrderItem = async (req, res) => {
@@ -41,7 +42,8 @@ export const createOrderItem = async (req, res) => {
 
     const customerId = customerRecord.id;
 
-    // 🔹 2. Create order items
+    // 🔹 2. Validate stock availability before processing
+    const stockUpdates = [];
     const createdOrderItems = [];
 
     for (const item of orderItems) {
@@ -51,12 +53,57 @@ export const createOrderItem = async (req, res) => {
         throw new Error("Each order item must have size, qnty and price");
       }
 
+      const quantity = Number(qnty);
+      
+      // Check stock availability
+      const companyStock = await CompanyStock.findOne({
+        where: { size },
+        transaction,
+        lock: transaction.LOCK.UPDATE // Lock the row for update
+      });
+
+      if (!companyStock) {
+        throw new Error(`Size ${size} not found in company stock`);
+      }
+
+      const currentStock = parseInt(companyStock.quantity);
+      if (currentStock < quantity) {
+        throw new Error(`Insufficient stock for size ${size}. Available: ${currentStock}, Requested: ${quantity}`);
+      }
+
+      stockUpdates.push({
+        companyStock,
+        quantity,
+        size
+      });
+    }
+
+    // 🔹 3. Process order items and update stock
+    for (const item of orderItems) {
+      const { size, qnty, price, money, fileName } = item;
+      const quantity = Number(qnty);
+
+      // Update company stock
+      const stockItem = stockUpdates.find(s => s.size === size);
+      if (stockItem) {
+        const newQuantity = parseInt(stockItem.companyStock.quantity) - quantity;
+        
+        await stockItem.companyStock.update(
+          {
+            quantity: newQuantity.toString(),
+            money: (newQuantity * Number(stockItem.companyStock.price)).toString() // Assuming price is stored
+          },
+          { transaction }
+        );
+      }
+
+      // Create order item
       const orderItem = await OrderItem.create(
         {
           size,
-          qnty: Number(qnty),
+          qnty: quantity,
           price: Number(price),
-          money: money ? Number(money) : Number(qnty) * Number(price),
+          money: money ? Number(money) : quantity * Number(price),
           fileName,
           customerId,
         },
@@ -66,10 +113,10 @@ export const createOrderItem = async (req, res) => {
       createdOrderItems.push(orderItem);
     }
 
-    // 🔹 3. Collect OrderItem IDs
+    // 🔹 4. Collect OrderItem IDs
     const orderItemIds = createdOrderItems.map((item) => item.id);
 
-    // 🔹 4. Find or create Remain
+    // 🔹 5. Find or create Remain
     let remain = await Remain.findOne({
       where: { customerId },
       transaction,
@@ -82,7 +129,7 @@ export const createOrderItem = async (req, res) => {
         {
           customerId,
           orderId: orderItemIds,
-          remainOrders: orderItemIds, // ✅ ADD HERE
+          remainOrders: orderItemIds,
         },
         { transaction }
       );
@@ -90,29 +137,53 @@ export const createOrderItem = async (req, res) => {
       await remain.update(
         {
           orderId: mergeUnique(remain.orderId, orderItemIds),
-          remainOrders: mergeUnique(remain.remainOrders, orderItemIds), // ✅ ADD HERE
+          remainOrders: mergeUnique(remain.remainOrders, orderItemIds),
         },
         { transaction }
       );
     }
 
-
+    // 🔹 6. Log stock changes
+    const stockChangeLogs = [];
+    for (const update of stockUpdates) {
+      stockChangeLogs.push({
+        size: update.size,
+        previousQuantity: parseInt(update.companyStock.quantity) + update.quantity,
+        newQuantity: parseInt(update.companyStock.quantity),
+        change: -update.quantity
+      });
+    }
 
     await transaction.commit();
 
     res.status(201).json({
-      message: "Order created successfully",
+      message: "Order created successfully and stock updated",
       customer: customerRecord,
       orderItems: createdOrderItems,
       remain,
+      stockUpdates: stockChangeLogs,
+      summary: {
+        totalItemsOrdered: orderItems.reduce((sum, item) => sum + Number(item.qnty), 0),
+        uniqueSizesOrdered: [...new Set(orderItems.map(item => item.size))],
+        stockReduced: stockChangeLogs.reduce((sum, log) => sum + log.change, 0)
+      }
     });
   } catch (error) {
     await transaction.rollback();
-    console.error(error);
+    console.error("Error creating order:", error);
 
-    res.status(500).json({
+    // Determine appropriate status code
+    let statusCode = 500;
+    if (error.message.includes("not found") || error.message.includes("Insufficient stock")) {
+      statusCode = 400;
+    }
+
+    res.status(statusCode).json({
       message: "Error creating order",
       error: error.message,
+      details: error.message.includes("stock") ? 
+        "Check available stock quantities before placing order" : 
+        "Please verify all required fields are correct"
     });
   }
 };
@@ -384,10 +455,12 @@ export const getCustomerOrdersByType = async (req, res) => {
       id: item.id,
       customerId: item.customerId,
       customerName: customerInfo?.fullname || null,
+      fileName: item.fileName ,
+      size: item.size ,
       money: parseFloat(item.money || 0),
       receipt: parseFloat(item.receipt || 0),
       remaining: parseFloat(item.money || 0) - parseFloat(item.receipt || 0),
-      status: parseFloat(item.receipt || 0) >= parseFloat(item.money || 0) ? 'paid' : 'unpaid',
+      qnty: parseFloat(item.qnty || 0),
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     }));

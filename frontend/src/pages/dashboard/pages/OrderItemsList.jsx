@@ -12,12 +12,16 @@ import {
   FaUndo
 } from "react-icons/fa";
 import Pagination from "../pagination/Pagination"; // Import the Pagination component
-
+import SelectedOrderItemsDownload from "./SelectedOrderItemsDownload";
+import { useSelector } from "react-redux";
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const OrderItemsList = ({
   refreshTrigger
 }) => {
+  const [selectedItemIds, setSelectedItemIds] = useState([]);
+  const [selectedItemsData, setSelectedItemsData] = useState([]);
+  const { currentUser } = useSelector((state) => state.user);
   const [orderItems, setOrderItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -25,7 +29,7 @@ const OrderItemsList = ({
   const [totalPages, setTotalPages] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [totalItems, setTotalItems] = useState(0);
-  
+
   // Editing state
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -63,6 +67,44 @@ const OrderItemsList = ({
     }
   };
 
+  const toggleSelectItem = (item) => {
+    setSelectedItemIds((prev) =>
+      prev.includes(item.id)
+        ? prev.filter((id) => id !== item.id)
+        : [...prev, item.id]
+    );
+
+    setSelectedItemsData((prev) =>
+      prev.find((i) => i.id === item.id)
+        ? prev.filter((i) => i.id !== item.id)
+        : [...prev, item]
+    );
+  };
+
+
+  const toggleSelectAll = () => {
+    const pageIds = orderItems.map((i) => i.id);
+    const allSelected = pageIds.every((id) => selectedItemIds.includes(id));
+
+    if (allSelected) {
+      setSelectedItemIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+      setSelectedItemsData((prev) =>
+        prev.filter((i) => !pageIds.includes(i.id))
+      );
+    } else {
+      setSelectedItemIds((prev) => [...new Set([...prev, ...pageIds])]);
+      setSelectedItemsData((prev) => [
+        ...prev,
+        ...orderItems.filter(
+          (i) => !prev.find((p) => p.id === i.id)
+        ),
+      ]);
+    }
+  };
+
+  console.log(currentUser.role);
+
+
   useEffect(() => {
     fetchOrderItems();
   }, [currentPage, perPage, refreshTrigger]);
@@ -97,14 +139,14 @@ const OrderItemsList = ({
   const handleEditChange = (field, value) => {
     setEditForm(prev => {
       const updated = { ...prev, [field]: value };
-      
+
       // Auto-calculate money if qnty or price changes
       if (field === "qnty" || field === "price") {
         const qnty = Number(updated.qnty) || 0;
         const price = Number(updated.price) || 0;
         updated.money = (qnty * price).toString();
       }
-      
+
       return updated;
     });
   };
@@ -127,17 +169,17 @@ const OrderItemsList = ({
       await axios.put(`${BASE_URL}/orderItems/${editingId}`, payload);
 
       // Update local state
-      setOrderItems(prev => prev.map(item => 
-        item.id === editingId 
-          ? { ...item, ...payload } 
+      setOrderItems(prev => prev.map(item =>
+        item.id === editingId
+          ? { ...item, ...payload }
           : item
       ));
 
       // Reset editing state
       cancelEdit();
-      
+
       alert("سفارش با موفقیت ویرایش شد");
-      
+
     } catch (err) {
       console.error("Error updating order item:", err);
       alert(err.response?.data?.message || "خطا در ویرایش سفارش");
@@ -156,13 +198,13 @@ const OrderItemsList = ({
   const totals = calculateTotals();
 
   // Format date
-const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  // Format in 'fa-IR' locale
-  const formatted = date.toLocaleDateString("fa-IR");
-  // Replace Persian/Arabic digits with English digits
-  return formatted.replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
-};
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    // Format in 'fa-IR' locale
+    const formatted = date.toLocaleDateString("eng-en");
+    // Replace Persian/Arabic digits with English digits
+    return formatted.replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
+  };
 
 
   // Check if there are changes
@@ -220,7 +262,17 @@ const formatDate = (dateString) => {
       <div className="overflow-x-auto">
         <table className="w-full text-center">
           <thead className="bg-cyan-50 text-cyan-800">
-            <tr>
+            <tr><th className="p-3 border-b font-semibold">
+              <input
+                type="checkbox"
+                onChange={toggleSelectAll}
+                checked={
+                  orderItems.length > 0 &&
+                  orderItems.every(i => selectedItemIds.includes(i.id))
+                }
+              />
+            </th>
+
               <th className="p-3 border-b font-semibold">#</th>
               <th className="p-3 border-b font-semibold">نام فایل</th>
               <th className="p-3 border-b font-semibold">سایز</th>
@@ -251,14 +303,19 @@ const formatDate = (dateString) => {
               orderItems.map((item, index) => (
                 <tr
                   key={item.id}
-                  className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${
-                    editingId === item.id ? "bg-yellow-50" : ""
-                  }`}
-                >
-                  <td className="p-3 text-gray-600">
-                    {(currentPage - 1) * perPage + index + 1}
+                  className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${editingId === item.id ? "bg-yellow-50" : ""
+                    }`}
+                ><td className="p-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedItemIds.includes(item.id)}
+                      onChange={() => toggleSelectItem(item)}
+                    />
                   </td>
-                  
+                  <td className="p-3 text-gray-600">
+                    {item.id}
+                  </td>
+
                   {/* File Name Cell */}
                   <td className="p-3">
                     {editingId === item.id ? (
@@ -275,7 +332,7 @@ const formatDate = (dateString) => {
                       </div>
                     )}
                   </td>
-                  
+
                   {/* Size Cell */}
                   <td className="p-3">
                     {editingId === item.id ? (
@@ -293,7 +350,7 @@ const formatDate = (dateString) => {
                       </span>
                     )}
                   </td>
-                  
+
                   {/* Quantity Cell */}
                   <td className="p-3">
                     {editingId === item.id ? (
@@ -312,7 +369,7 @@ const formatDate = (dateString) => {
                       </span>
                     )}
                   </td>
-                  
+
                   {/* Price Cell */}
                   <td className="p-3">
                     {editingId === item.id ? (
@@ -332,7 +389,7 @@ const formatDate = (dateString) => {
                       </span>
                     )}
                   </td>
-                  
+
                   {/* Money Cell */}
                   <td className="p-3">
                     {editingId === item.id ? (
@@ -354,52 +411,54 @@ const formatDate = (dateString) => {
                       </span>
                     )}
                   </td>
-                  
+
                   {/* Date Cell */}
                   <td className="p-3 text-gray-500 text-sm">
                     {formatDate(item.createdAt)}
                   </td>
-                  
+
                   {/* Actions Cell */}
                   <td className="p-3">
-                    <div className="flex items-center justify-center gap-2">
-                      {editingId === item.id ? (
-                        <>
-                          <button
-                            onClick={saveEdit}
-                            className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-                            title="ذخیره"
-                            disabled={!hasChanges()}
-                          >
-                            <FaSave />
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                            title="لغو"
-                          >
-                            <FaTimes />
-                          </button>
-                          {hasChanges() && (
+                    {currentUser?.role == "admin" ? (
+                      <div className="flex items-center justify-center gap-2">
+                        {editingId === item.id ? (
+                          <>
                             <button
-                              onClick={() => {
-                                setEditForm({
-                                  size: originalItem.size || "",
-                                  qnty: originalItem.qnty || "",
-                                  price: originalItem.price || "",
-                                  money: originalItem.money || "",
-                                  fileName: originalItem.fileName || ""
-                                });
-                              }}
-                              className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-                              title="بازنشانی"
+                              onClick={saveEdit}
+                              className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                              title="ذخیره"
+                              disabled={!hasChanges()}
                             >
-                              <FaUndo />
+                              <FaSave />
                             </button>
-                          )}
-                        </>
-                      ) : (
-                        <>
+
+                            <button
+                              onClick={cancelEdit}
+                              className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                              title="لغو"
+                            >
+                              <FaTimes />
+                            </button>
+
+                            {hasChanges() && (
+                              <button
+                                onClick={() => {
+                                  setEditForm({
+                                    size: originalItem.size || "",
+                                    qnty: originalItem.qnty || "",
+                                    price: originalItem.price || "",
+                                    money: originalItem.money || "",
+                                    fileName: originalItem.fileName || "",
+                                  });
+                                }}
+                                className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                                title="بازنشانی"
+                              >
+                                <FaUndo />
+                              </button>
+                            )}
+                          </>
+                        ) : (
                           <button
                             onClick={() => startEdit(item)}
                             className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg"
@@ -408,27 +467,35 @@ const formatDate = (dateString) => {
                           >
                             <FaEdit />
                           </button>
-                        </>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    ):"--"}
                   </td>
+
                 </tr>
               ))
             )}
           </tbody>
-            
+          {selectedItemsData.length > 0 && (
+            <div className="p-6 border-t bg-gray-50">
+              <SelectedOrderItemsDownload
+                items={selectedItemsData}
+              />
+            </div>
+          )}
+
         </table>
       </div>
 
       {/* 🔹 REPLACED PAGINATION WITH THE PREPARED COMPONENT */}
-     
-        <div className="p-6 border-t border-gray-200">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={(page) => setCurrentPage(page)}
-          />
-        </div>
+
+      <div className="p-6 border-t border-gray-200">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      </div>
 
       {/* Editing Warning */}
       {editingId && (
