@@ -280,7 +280,7 @@ const StaffManager = () => {
                 <th className="p-3 border-b font-semibold">تذکره</th>
                 <th className="p-3 border-b font-semibold">معاش (افغانی)</th>
                 <th className="p-3 border-b font-semibold">روز کاری</th>
-                <th className="p-3 border-b font-semibold">آخرین بروزرسانی</th>
+                <th className="p-3 border-b font-semibold">تاریخ ثبت</th>
                 <th className="p-3 border-b font-semibold">عملیات</th>
               </tr>
             </thead>
@@ -323,7 +323,12 @@ const StaffManager = () => {
                       </span>
                     </td>
                     <td className="p-3 text-gray-500 text-sm">
-                      {formatDate(staff.updatedAt)}
+                          {staff.createdAt ?
+                      new Date(staff.createdAt)
+                        .toLocaleDateString('eng-en')
+                        .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+                      : '—'
+                    }
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-2">

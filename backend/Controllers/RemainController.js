@@ -6,6 +6,11 @@ import OrderItem from "../Models/OrderItems.js";
 export const getRemainOrderItemsByCustomer = async (req, res) => {
   try {
     const { customerId } = req.params;
+    
+    // دریافت پارامترهای pagination از query
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
     if (!customerId) {
       return res.status(400).json({
@@ -31,22 +36,45 @@ export const getRemainOrderItemsByCustomer = async (req, res) => {
       return res.json({
         customer: remain.customer,
         orderItems: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalItems: 0,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
         message: "No remaining order items",
       });
     }
 
-    // 2️⃣ fetch order items by IDs
-    const orderItems = await OrderItem.findAll({
+    // 2️⃣ fetch order items by IDs با pagination
+    const { count, rows: orderItems } = await OrderItem.findAndCountAll({
       where: {
         id: orderIds,
       },
       order: [["id", "DESC"]],
+      limit: limit,
+      offset: offset,
     });
+
+    const totalPages = Math.ceil(count / limit);
+    const hasNextPage = page < totalPages;
+    const hasPreviousPage = page > 1;
 
     res.json({
       customer: remain.customer,
-      orderCount: orderItems.length,
+      orderCount: count,
       orderItems,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalItems: count,
+        itemsPerPage: limit,
+        hasNextPage: hasNextPage,
+        hasPreviousPage: hasPreviousPage,
+        nextPage: hasNextPage ? page + 1 : null,
+        previousPage: hasPreviousPage ? page - 1 : null,
+      },
     });
   } catch (error) {
     console.error(error);

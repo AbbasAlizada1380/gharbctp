@@ -249,7 +249,7 @@ const Orders = () => {
       </div>
 
       {/* Pass the refreshTrigger prop */}
-      <OrderItemsList refreshTrigger={refreshTrigger} />
+     <div className="mt-4"> <OrderItemsList refreshTrigger={refreshTrigger} /></div>
     </div>
   );
 };

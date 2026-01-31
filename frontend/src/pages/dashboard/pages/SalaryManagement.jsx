@@ -372,10 +372,11 @@ const SalaryManagement = () => {
                 <th className="p-3 border-b font-semibold">کارمند</th>
                 <th className="p-3 border-b font-semibold">روزهای حضور</th>
                 <th className="p-3 border-b font-semibold">مجموع اضافه‌کاری (ساعت)</th>
-                <th className="p-3 border-b font-semibold">حقوق اضافه‌کاری</th>
-                <th className="p-3 border-b font-semibold">حقوق پایه</th>
+                <th className="p-3 border-b font-semibold">معاش اضافه‌کاری</th>
+                <th className="p-3 border-b font-semibold">معاش اصلی</th>
                 <th className="p-3 border-b font-semibold">مجموع کل</th>
                 <th className="p-3 border-b font-semibold">   پرداخت شده</th>
+                <th className="p-3 border-b font-semibold">تاریخ</th>
                 <th className="p-3 border-b font-semibold">عملیات</th>
               </tr>
             </thead>
@@ -385,7 +386,7 @@ const SalaryManagement = () => {
                 <tr>
                   <td colSpan="8" className="p-8">
                     <div className="flex flex-col items-center justify-center">
-                      
+
                       <p className="text-gray-500 text-lg">هیچ رکوردی ثبت نشده است</p>
                     </div>
                   </td>
@@ -442,6 +443,16 @@ const SalaryManagement = () => {
                       <td className="p-3">
                         <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm font-bold">
                           {(record.receipt || 0)} ؋
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className="px-3 py-1 ">
+                           {record.createdAt ?
+                      new Date(record.createdAt)
+                        .toLocaleDateString('eng-en')
+                        .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+                      : '—'
+                    }
                         </span>
                       </td>
                       <td className="p-3">
