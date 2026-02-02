@@ -54,7 +54,7 @@ export const createOrderItem = async (req, res) => {
       }
 
       const quantity = Number(qnty);
-      
+
       // Check stock availability
       const companyStock = await CompanyStock.findOne({
         where: { size },
@@ -87,7 +87,7 @@ export const createOrderItem = async (req, res) => {
       const stockItem = stockUpdates.find(s => s.size === size);
       if (stockItem) {
         const newQuantity = parseInt(stockItem.companyStock.quantity) - quantity;
-        
+
         await stockItem.companyStock.update(
           {
             quantity: newQuantity.toString(),
@@ -181,8 +181,8 @@ export const createOrderItem = async (req, res) => {
     res.status(statusCode).json({
       message: "Error creating order",
       error: error.message,
-      details: error.message.includes("stock") ? 
-        "Check available stock quantities before placing order" : 
+      details: error.message.includes("stock") ?
+        "Check available stock quantities before placing order" :
         "Please verify all required fields are correct"
     });
   }
@@ -455,8 +455,8 @@ export const getCustomerOrdersByType = async (req, res) => {
       id: item.id,
       customerId: item.customerId,
       customerName: customerInfo?.fullname || null,
-      fileName: item.fileName ,
-      size: item.size ,
+      fileName: item.fileName,
+      size: item.size,
       money: parseFloat(item.money || 0),
       receipt: parseFloat(item.receipt || 0),
       remaining: parseFloat(item.money || 0) - parseFloat(item.receipt || 0),
@@ -494,6 +494,138 @@ export const getCustomerOrdersByType = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
+/* ===========================
+   Simple Search Order Items
+=========================== */
+/* ===========================
+   Simple Search Order Items
+=========================== */
+export const simpleSearchOrderItems = async (req, res) => {
+  try {
+    const { q, customerId } = req.query;
+
+    console.log("🔍 Search request received:", { q, customerId }); // Debug log
+
+    if (!q || q.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: "Search query (q) is required"
+      });
+    }
+
+    const searchTerm = q.trim();
+    const numericSearch = parseInt(searchTerm);
+
+    console.log("🔍 Parsed search term:", { searchTerm, numericSearch }); // Debug log
+
+    const whereConditions = {};
+
+    if (customerId) {
+      whereConditions.customerId = customerId;
+    }
+
+    // Search by ID (exact) OR filename (partial)
+    whereConditions[Op.or] = [
+      { fileName: { [Op.like]: `%${searchTerm}%` } }
+    ];
+
+    // Only add numeric ID search if the term is actually a number
+    if (!isNaN(numericSearch)) {
+      whereConditions[Op.or].push({ id: numericSearch });
+    }
+
+    console.log("🔍 WHERE conditions:", JSON.stringify(whereConditions)); // Debug log
+
+    const items = await OrderItem.findAll({
+      where: whereConditions,
+      include: [
+        {
+          model: Customer,
+          as: "customer",
+          attributes: ['id', 'fullname']
+        }
+      ],
+      order: [["id", "DESC"]],
+      limit: 50
+    });
+
+    console.log(`🔍 Found ${items.length} items`); // Debug log
+
+    res.json({
+      success: true,
+      count: items.length,
+      items: items.map(item => ({
+        id: item.id,
+        customerId: item.customerId,
+        customerName: item.customer?.fullname,
+        fileName: item.fileName,
+        size: item.size,
+        qnty: item.qnty,
+        money: item.money,
+        receipt: item.receipt,
+        remaining: item.money - item.receipt,
+        createdAt: item.createdAt
+      }))
+    });
+
+  } catch (error) {
+    console.error("❌ Error in simpleSearchOrderItems:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error searching order items",
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+export const getOrderItemsByDateRange = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({
+        message: "Both 'from' and 'to' dates are required",
+      });
+    }
+
+    // Convert to proper date range
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    // Set end date to end of day (23:59:59)
+    toDate.setHours(23, 59, 59, 999);
+
+    const orderItems = await OrderItem.findAll({
+      where: {
+        createdAt: {
+          [Op.between]: [fromDate, toDate],
+        },
+      },
+      include: [
+        {
+          model: Customer,
+          as: "customer", // VERY IMPORTANT
+          attributes: ["id", "fullname"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      message: "Order items fetched successfully",
+      count: orderItems.length,
+      data: orderItems,
+    });
+  } catch (error) {
+    console.error("Error fetching order items by date:", error);
+
+    res.status(500).json({
+      message: "Error fetching order items",
       error: error.message,
     });
   }

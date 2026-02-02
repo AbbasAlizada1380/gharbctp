@@ -204,7 +204,7 @@ const RemainOrderItems = ({ customer, onClose }) => {
                       className="hover:bg-gray-50 border-b last:border-0 transition-colors"
                     >
                       <td className="p-3 text-gray-600">
-                        {(currentPage - 1) * itemsPerPage + index + 1}
+                        {item.id}
                       </td>
                       <td className="p-3 font-medium text-gray-800">{item.fileName}</td>
                       <td className="p-3 text-gray-600">{item.size}</td>

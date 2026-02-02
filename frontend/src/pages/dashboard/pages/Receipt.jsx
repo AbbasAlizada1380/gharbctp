@@ -15,20 +15,25 @@ import {
   FaUndo,
   FaCalculator,
   FaPen,
-  FaFilter
+  FaFilter,
+  FaChevronDown,
+  FaChevronUp,
+  FaSearch
 } from "react-icons/fa";
 import Pagination from "../pagination/Pagination";
 import PrintBillOrder from "./PrintOrderBill";
+
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const initialForm = {
   customer: "",
   amount: "",
-  calculated: false, // Add calculated field to form
+  calculated: false,
 };
 
 const ReceiptManager = () => {
   const [customers, setCustomers] = useState([]);
+  const [allCustomers, setAllCustomers] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
@@ -49,20 +54,62 @@ const ReceiptManager = () => {
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
-  const [filterCalculated, setFilterCalculated] = useState(""); // "", "true", "false"
+  const [filterCalculated, setFilterCalculated] = useState("");
   const [filterCustomer, setFilterCustomer] = useState("");
+
+  // Customer fetch state
+  const [loadingAllCustomers, setLoadingAllCustomers] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showAllCustomers, setShowAllCustomers] = useState(false);
 
   // Original values for reset during edit
   const [originalReceipt, setOriginalReceipt] = useState(null);
 
-  /* ---------------- FETCH CUSTOMERS ---------------- */
-  const fetchCustomers = async () => {
+  /* ---------------- FETCH ALL CUSTOMERS (ALL PAGES) ---------------- */
+  const fetchAllCustomers = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/customers`);
-      setCustomers(res.data.customers || []);
+      setLoadingAllCustomers(true);
+      let allCustomersData = [];
+      let page = 1;
+      let hasMorePages = true;
+
+      while (hasMorePages) {
+        try {
+          const res = await axios.get(`${BASE_URL}/customers`, {
+            params: {
+              page,
+              limit: 1000
+            }
+          });
+
+          if (res.data?.customers && res.data.customers.length > 0) {
+            allCustomersData = [...allCustomersData, ...res.data.customers];
+            
+            // بررسی آیا صفحه بیشتری وجود دارد
+            const totalPages = res.data?.pagination?.totalPages || 1;
+            if (page >= totalPages) {
+              hasMorePages = false;
+            } else {
+              page++;
+            }
+          } else {
+            hasMorePages = false;
+          }
+        } catch (err) {
+          console.error(`Error fetching customers page ${page}:`, err);
+          hasMorePages = false;
+        }
+      }
+
+      setAllCustomers(allCustomersData);
+      // همچنین برای backward compatibility
+      setCustomers(allCustomersData);
+      return allCustomersData;
     } catch (error) {
-      console.error("Error fetching customers", error);
-      setError("خطا در دریافت مشتریان");
+      console.error("Error fetching all customers", error);
+      return [];
+    } finally {
+      setLoadingAllCustomers(false);
     }
   };
 
@@ -99,7 +146,7 @@ const ReceiptManager = () => {
   };
 
   useEffect(() => {
-    fetchCustomers();
+    fetchAllCustomers();
   }, []);
 
   useEffect(() => {
@@ -108,7 +155,7 @@ const ReceiptManager = () => {
 
   /* ---------------- PRINT RECEIPT ---------------- */
   const handlePrintReceipt = (receipt) => {
-    const customerData = customers.find(c => c.id.toString() === receipt.customer.toString());
+    const customerData = allCustomers.find(c => c.id.toString() === receipt.customer.toString());
 
     const orderForPrint = {
       id: receipt.id,
@@ -149,7 +196,7 @@ const ReceiptManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return; // ⛔ جلوگیری از submit دوباره
+    if (loading) return;
 
     setLoading(true);
     setError("");
@@ -181,8 +228,6 @@ const ReceiptManager = () => {
     }
   };
 
-
-
   /* ---------------- CANCEL EDIT ---------------- */
   const cancelEdit = () => {
     setForm(initialForm);
@@ -201,10 +246,6 @@ const ReceiptManager = () => {
     }
   };
 
-
-
-
-
   /* ---------------- CLEAR FILTERS ---------------- */
   const clearFilters = () => {
     setFilterCalculated("");
@@ -222,10 +263,24 @@ const ReceiptManager = () => {
     );
   };
 
-  // Get customer name
+  // Get customer name from all customers
   const getCustomerName = (customerId) => {
-    const customer = customers.find(c => c.id.toString() === customerId.toString());
+    const customer = allCustomers.find(c => c.id.toString() === customerId.toString());
     return customer?.fullname || customer?.name || "مشتری ناشناس";
+  };
+
+  // Filter customers based on search
+  const getFilteredCustomers = () => {
+    if (customerSearch.trim() === "") {
+      return allCustomers;
+    }
+    
+    const searchTerm = customerSearch.toLowerCase();
+    return allCustomers.filter(customer => 
+      customer.fullname?.toLowerCase().includes(searchTerm) ||
+      customer.phoneNumber?.includes(customerSearch) ||
+      customer.id?.toString().includes(customerSearch)
+    );
   };
 
   // Format date
@@ -239,6 +294,10 @@ const ReceiptManager = () => {
   const totalAmount = receipts.reduce((sum, receipt) => sum + parseFloat(receipt.amount || 0), 0);
   const calculatedAmount = receipts.filter(r => r.calculated).reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
   const manualAmount = receipts.filter(r => !r.calculated).reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+
+  // Get customers for display in select (with search and pagination)
+  const displayCustomers = getFilteredCustomers();
+  const limitedCustomers = showAllCustomers ? displayCustomers : displayCustomers.slice(0, 20);
 
   if (fetchLoading && receipts.length === 0) {
     return (
@@ -273,7 +332,7 @@ const ReceiptManager = () => {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2"
                 >
                   <option value="">همه مشتریان</option>
-                  {customers.map((c) => (
+                  {allCustomers.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.fullname || c.name}
                     </option>
@@ -295,9 +354,40 @@ const ReceiptManager = () => {
                   <FaMoneyBillWave className="text-blue-600 text-2xl" />
                 </div>
               </div>
+              <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-green-800">مبلغ محاسبه‌شده</p>
+                    <p className="text-xl font-bold text-green-900">
+                      {calculatedAmount.toLocaleString('en-US')} افغانی
+                    </p>
+                  </div>
+                  <FaCalculator className="text-green-600 text-2xl" />
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-800">مبلغ دستی</p>
+                    <p className="text-xl font-bold text-purple-900">
+                      {manualAmount.toLocaleString('en-US')} افغانی
+                    </p>
+                  </div>
+                  <FaPen className="text-purple-600 text-2xl" />
+                </div>
+              </div>
             </div>
           </div>
         )}
+        
+        {/* Toggle Filters Button */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="w-full p-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium flex items-center justify-center gap-2"
+        >
+          <FaFilter />
+          {showFilters ? "پنهان کردن فیلترها" : "نمایش فیلترها"}
+        </button>
       </div>
 
       {/* Form Section */}
@@ -327,22 +417,25 @@ const ReceiptManager = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <span className="text-red-500">*</span> انتخاب مشتری
               </label>
-              <div className="relative">
-                <select
-                  name="customer"
-                  value={form.customer}
-                  onChange={handleChange}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-10 py-3 pr-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition appearance-none"
-                >
-                  <option value="">انتخاب مشتری</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.fullname || c.name} {c.phone ? `(${c.phone})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              
+              
+                  <div className="relative">
+                    <select
+                      name="customer"
+                      value={form.customer}
+                      onChange={handleChange}
+                      required
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition appearance-none"
+                    >
+                      <option value="">انتخاب مشتری</option>
+                      {allCustomers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.fullname || c.name} {c.phoneNumber ? `(${c.phoneNumber})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+             
             </div>
 
             {/* Amount Input */}
@@ -367,6 +460,7 @@ const ReceiptManager = () => {
                 />
               </div>
             </div>
+
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
@@ -399,13 +493,7 @@ const ReceiptManager = () => {
               <button
                 type="submit"
                 disabled={loading || !hasChanges()}
-                className="
-    px-6 py-3
-    bg-gradient-to-r from-cyan-800 to-cyan-600
-    text-white rounded-lg
-    transition font-medium shadow-md
-    disabled:opacity-50 disabled:cursor-not-allowed
-  "
+                className="px-6 py-3 bg-gradient-to-r from-cyan-800 to-cyan-600 text-white rounded-lg transition font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-2">
                   {loading ? (
@@ -424,7 +512,6 @@ const ReceiptManager = () => {
                   </span>
                 </div>
               </button>
-
             </div>
           </form>
         </div>
@@ -446,6 +533,13 @@ const ReceiptManager = () => {
                 </p>
               </div>
             </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition"
+            >
+              <FaFilter />
+              <span>فیلترها</span>
+            </button>
           </div>
         </div>
 
@@ -464,7 +558,7 @@ const ReceiptManager = () => {
             <tbody>
               {receipts.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="p-8">
+                  <td colSpan="5" className="p-8">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <FaFileInvoiceDollar className="text-4xl text-gray-300" />
                       <p className="text-lg text-gray-500">هیچ رسیدی یافت نشد</p>
@@ -477,11 +571,11 @@ const ReceiptManager = () => {
                   <tr
                     key={receipt.id}
                     className={`
-    border-b last:border-0 transition-colors
-    hover:bg-gray-50
-    ${editingId === receipt.id ? "bg-yellow-50" : ""}
-    ${receipt.calculated ? "bg-blue-50/40" : ""}
-  `}
+                      border-b last:border-0 transition-colors
+                      hover:bg-gray-50
+                      ${editingId === receipt.id ? "bg-yellow-50" : ""}
+                      ${receipt.calculated ? "bg-blue-50/40" : ""}
+                    `}
                   >
                     {/* ID */}
                     <td className="p-3 text-gray-600 font-medium">
@@ -504,11 +598,11 @@ const ReceiptManager = () => {
                     <td className="p-3">
                       <span
                         className={`
-        inline-block px-3 py-1 rounded-full text-sm font-bold
-        ${receipt.calculated
+                          inline-block px-3 py-1 rounded-full text-sm font-bold
+                          ${receipt.calculated
                             ? "bg-blue-100 text-blue-800"
                             : "bg-green-100 text-green-800"}
-      `}
+                        `}
                       >
                         {Number(receipt.amount || 0).toLocaleString("en-US")}
                       </span>
@@ -533,7 +627,6 @@ const ReceiptManager = () => {
                       </div>
                     </td>
                   </tr>
-
                 ))
               )}
             </tbody>

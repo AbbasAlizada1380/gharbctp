@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   FaEdit,
@@ -9,11 +9,15 @@ import {
   FaFileInvoiceDollar,
   FaCalendarAlt,
   FaCheck,
-  FaUndo
+  FaUndo,
+  FaSearch,
+  FaTimesCircle
 } from "react-icons/fa";
-import Pagination from "../pagination/Pagination"; // Import the Pagination component
+import Pagination from "../pagination/Pagination";
 import SelectedOrderItemsDownload from "./SelectedOrderItemsDownload";
 import { useSelector } from "react-redux";
+import SearchBar from "../searching/SearchBar"; // Import the SearchBar component
+import DateOrderDownload from "./report/DateOrderDownload";
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const OrderItemsList = ({
@@ -29,6 +33,13 @@ const OrderItemsList = ({
   const [totalPages, setTotalPages] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [totalItems, setTotalItems] = useState(0);
+
+  // 🔹 NEW: Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchActive, setSearchActive] = useState(false);
+  const searchBarRef = useRef(null);
 
   // Editing state
   const [editingId, setEditingId] = useState(null);
@@ -67,6 +78,30 @@ const OrderItemsList = ({
     }
   };
 
+  // 🔹 Handle search results from SearchBar
+  const handleSearchResults = (results, count) => {
+    setSearchResults(results);
+    setOrderItems(results); // Display search results in table
+    setTotalItems(count || results.length);
+    setTotalPages(1); // Search results typically don't need pagination
+    setCurrentPage(1);
+    setSearchActive(results.length > 0);
+
+    // Clear selection when search changes
+    setSelectedItemIds([]);
+    setSelectedItemsData([]);
+  };
+
+  // 🔹 Clear search and show all items
+  const clearSearch = () => {
+    if (searchBarRef.current) {
+      searchBarRef.current.reset();
+    }
+    setSearchActive(false);
+    setSearchResults([]);
+    fetchOrderItems(); // Reload all items
+  };
+
   const toggleSelectItem = (item) => {
     setSelectedItemIds((prev) =>
       prev.includes(item.id)
@@ -80,7 +115,6 @@ const OrderItemsList = ({
         : [...prev, item]
     );
   };
-
 
   const toggleSelectAll = () => {
     const pageIds = orderItems.map((i) => i.id);
@@ -102,12 +136,11 @@ const OrderItemsList = ({
     }
   };
 
-  console.log(currentUser.role);
-
-
   useEffect(() => {
-    fetchOrderItems();
-  }, [currentPage, perPage, refreshTrigger]);
+    if (!searchActive) {
+      fetchOrderItems();
+    }
+  }, [currentPage, perPage, refreshTrigger, searchActive]);
 
   // Start editing an item
   const startEdit = (item) => {
@@ -140,7 +173,6 @@ const OrderItemsList = ({
     setEditForm(prev => {
       const updated = { ...prev, [field]: value };
 
-      // Auto-calculate money if qnty or price changes
       if (field === "qnty" || field === "price") {
         const qnty = Number(updated.qnty) || 0;
         const price = Number(updated.price) || 0;
@@ -156,7 +188,6 @@ const OrderItemsList = ({
     if (!editingId) return;
 
     try {
-      // Prepare payload
       const payload = {
         size: editForm.size,
         qnty: Number(editForm.qnty),
@@ -165,20 +196,26 @@ const OrderItemsList = ({
         fileName: editForm.fileName
       };
 
-      // Send update request
       await axios.put(`${BASE_URL}/orderItems/${editingId}`, payload);
 
-      // Update local state
       setOrderItems(prev => prev.map(item =>
         item.id === editingId
           ? { ...item, ...payload }
           : item
       ));
 
-      // Reset editing state
       cancelEdit();
-
       alert("سفارش با موفقیت ویرایش شد");
+
+      // Refresh after edit
+      if (searchActive) {
+        // If in search mode, refresh the search
+        if (searchBarRef.current) {
+          searchBarRef.current.search(searchQuery);
+        }
+      } else {
+        fetchOrderItems();
+      }
 
     } catch (err) {
       console.error("Error updating order item:", err);
@@ -200,12 +237,9 @@ const OrderItemsList = ({
   // Format date
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    // Format in 'fa-IR' locale
     const formatted = date.toLocaleDateString("eng-en");
-    // Replace Persian/Arabic digits with English digits
     return formatted.replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
   };
-
 
   // Check if there are changes
   const hasChanges = () => {
@@ -232,7 +266,7 @@ const OrderItemsList = ({
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-cyan-800 to-cyan-600 text-white p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-full">
               <FaFileInvoiceDollar className="text-xl" />
@@ -240,7 +274,15 @@ const OrderItemsList = ({
             <div>
               <h2 className="text-xl font-bold">لیست سفارشات</h2>
               <p className="text-sm text-white/80">
-                {totalItems} سفارش | صفحه {currentPage} از {totalPages}
+                {searchActive ? (
+                  <span>
+                    نتایج جستجو: {searchResults.length} مورد یافت شد
+                  </span>
+                ) : (
+                  <span>
+                    {totalItems} سفارش | صفحه {currentPage} از {totalPages}
+                  </span>
+                )}
                 {editingId && (
                   <span className="ml-4 bg-yellow-500 text-white px-2 py-1 rounded text-xs">
                     حالت ویرایش #{editingId}
@@ -257,22 +299,70 @@ const OrderItemsList = ({
             </div>
           )}
         </div>
+
+        {/* 🔹 SearchBar Component */}
+        <div className=" grid grid-cols-1 sm:grid-cols-2 items-center">
+          <div className="w-full">
+            <SearchBar
+              ref={searchBarRef}
+              onResults={handleSearchResults}
+              placeholder="جستجو بر اساس شماره بیل یا نام فایل..."
+            />
+          </div>
+          <div className="flex justify-end">
+            <DateOrderDownload />
+          </div>
+        </div>
+        {/* 🔹 Search Active Indicator */}
+        {searchActive && searchResults.length > 0 && (
+          <div className="mt-3 flex items-center justify-between text-sm bg-white/10 p-2 rounded-lg">
+            <span className="text-cyan-100">
+              نتایج جستجو: {searchResults.length} مورد یافت شد
+            </span>
+            <button
+              onClick={clearSearch}
+              className="text-white hover:text-cyan-200 underline flex items-center gap-1 text-sm"
+            >
+              <FaTimesCircle /> نمایش همه سفارشات
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* 🔹 No Search Results */}
+      {searchActive && searchResults.length === 0 && (
+        <div className="bg-yellow-50 border-b border-yellow-200 p-4 text-center">
+          <div className="flex flex-col items-center gap-2 text-yellow-800">
+            <FaSearch className="text-xl" />
+            <p className="font-medium">نتیجه‌ای یافت نشد</p>
+            <p className="text-sm text-yellow-600">
+              هیچ سفارشی با این مشخصات یافت نشد
+            </p>
+            <button
+              onClick={clearSearch}
+              className="text-sm bg-yellow-100 hover:bg-yellow-200 px-4 py-2 rounded mt-2"
+            >
+              نمایش همه سفارشات
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Order Items Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-center">
           <thead className="bg-cyan-50 text-cyan-800">
-            <tr><th className="p-3 border-b font-semibold">
-              <input
-                type="checkbox"
-                onChange={toggleSelectAll}
-                checked={
-                  orderItems.length > 0 &&
-                  orderItems.every(i => selectedItemIds.includes(i.id))
-                }
-              />
-            </th>
-
+            <tr>
+              <th className="p-3 border-b font-semibold">
+                <input
+                  type="checkbox"
+                  onChange={toggleSelectAll}
+                  checked={
+                    orderItems.length > 0 &&
+                    orderItems.every(i => selectedItemIds.includes(i.id))
+                  }
+                />
+              </th>
               <th className="p-3 border-b font-semibold">#</th>
               <th className="p-3 border-b font-semibold">نام فایل</th>
               <th className="p-3 border-b font-semibold">سایز</th>
@@ -289,13 +379,19 @@ const OrderItemsList = ({
             </tr>
           </thead>
           <tbody>
-            {orderItems.length === 0 ? (
+            {orderItems.length === 0 && !loading ? (
               <tr>
-                <td colSpan="8" className="p-8 text-center text-gray-500">
+                <td colSpan="9" className="p-8 text-center text-gray-500">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <FaFileInvoiceDollar className="text-4xl text-gray-300" />
-                    <p className="text-lg">هیچ سفارشی یافت نشد</p>
-                    <p className="text-sm text-gray-400">شروع به ثبت سفارش جدید کنید</p>
+                    <p className="text-lg">
+                      {searchActive ? "هیچ نتیجه‌ای یافت نشد" : "هیچ سفارشی یافت نشد"}
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      {searchActive
+                        ? "لطفاً عبارت جستجوی دیگری را امتحان کنید"
+                        : "شروع به ثبت سفارش جدید کنید"}
+                    </p>
                   </div>
                 </td>
               </tr>
@@ -304,8 +400,9 @@ const OrderItemsList = ({
                 <tr
                   key={item.id}
                   className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${editingId === item.id ? "bg-yellow-50" : ""
-                    }`}
-                ><td className="p-3">
+                    } ${searchActive ? "bg-blue-50/30" : ""}`}
+                >
+                  <td className="p-3">
                     <input
                       type="checkbox"
                       checked={selectedItemIds.includes(item.id)}
@@ -402,7 +499,7 @@ const OrderItemsList = ({
                         className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center bg-gray-50"
                         placeholder="مبلغ"
                         required
-                        readOnly // Auto-calculated, but can be manually overridden
+                        readOnly
                         onFocus={(e) => e.target.removeAttribute('readonly')}
                       />
                     ) : (
@@ -419,7 +516,7 @@ const OrderItemsList = ({
 
                   {/* Actions Cell */}
                   <td className="p-3">
-                    {currentUser?.role == "admin" ? (
+                    {currentUser?.role === "admin" ? (
                       <div className="flex items-center justify-center gap-2">
                         {editingId === item.id ? (
                           <>
@@ -469,33 +566,33 @@ const OrderItemsList = ({
                           </button>
                         )}
                       </div>
-                    ):"--"}
+                    ) : "--"}
                   </td>
-
                 </tr>
               ))
             )}
           </tbody>
-          {selectedItemsData.length > 0 && (
-            <div className="p-6 border-t bg-gray-50">
-              <SelectedOrderItemsDownload
-                items={selectedItemsData}
-              />
-            </div>
-          )}
-
         </table>
       </div>
 
-      {/* 🔹 REPLACED PAGINATION WITH THE PREPARED COMPONENT */}
+      {/* Selected Items Download Section */}
+      {selectedItemsData.length > 0 && (
+        <div className="p-6 border-t bg-gray-50">
+          <SelectedOrderItemsDownload
+            items={selectedItemsData}
+          />
+        </div>
+      )}
 
-      <div className="p-6 border-t border-gray-200">
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={(page) => setCurrentPage(page)}
-        />
-      </div>
+    
+        <div className="p-6 border-t border-gray-200">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
+        </div>
+
 
       {/* Editing Warning */}
       {editingId && (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useSelector } from "react-redux";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaTrash, FaSpinner } from "react-icons/fa";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -21,43 +21,73 @@ export default function MoneyManager() {
   });
   const [summary, setSummary] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
+  
+  // 🔹 New loading states
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [ownersLoading, setOwnersLoading] = useState(false);
+  const [moneyLoading, setMoneyLoading] = useState(false);
 
   // 🔹 Fetch owners
   const fetchOwners = async () => {
-    const res = await axios.get(`${BASE_URL}/owner`);
-    setOwners(res.data.owners);
+    setOwnersLoading(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/owner`);
+      setOwners(res.data.owners);
+    } catch (error) {
+      console.error("Error fetching owners:", error);
+    } finally {
+      setOwnersLoading(false);
+    }
   };
 
   // 🔹 Fetch money records with filters
   const fetchMoney = async () => {
-    const params = new URLSearchParams();
-    if (filters.calculated !== "") params.append("calculated", filters.calculated);
-    if (filters.ownerId) params.append("ownerId", filters.ownerId);
+    setMoneyLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.calculated !== "") params.append("calculated", filters.calculated);
+      if (filters.ownerId) params.append("ownerId", filters.ownerId);
 
-    const url = `${BASE_URL}/money${params.toString() ? `?${params.toString()}` : ''}`;
-    const res = await axios.get(url);
-    setMoneyList(res.data.moneyList);
+      const url = `${BASE_URL}/money${params.toString() ? `?${params.toString()}` : ''}`;
+      const res = await axios.get(url);
+      setMoneyList(res.data.moneyList || []);
+      setSummary(res.data.summary || null);
+    } catch (error) {
+      console.error("Error fetching money:", error);
+      setMoneyList([]);
+      setSummary(null);
+    } finally {
+      setMoneyLoading(false);
+      setInitialLoading(false);
+    }
   };
 
   // 🔹 Fetch summary statistics
   const fetchSummary = async () => {
-    const params = new URLSearchParams();
-    if (filters.ownerId) params.append("ownerId", filters.ownerId);
+    try {
+      const params = new URLSearchParams();
+      if (filters.ownerId) params.append("ownerId", filters.ownerId);
 
-    const url = `${BASE_URL}/money/summary${params.toString() ? `?${params.toString()}` : ''}`;
-    const res = await axios.get(url);
-    setSummary(res.data.summary);
+      const url = `${BASE_URL}/money/summary${params.toString() ? `?${params.toString()}` : ''}`;
+      const res = await axios.get(url);
+      setSummary(res.data);
+    } catch (error) {
+      console.error("Error fetching summary:", error);
+    }
   };
 
   useEffect(() => {
-    fetchOwners();
-    fetchMoney();
-    fetchSummary();
+    const fetchInitialData = async () => {
+      setInitialLoading(true);
+      await Promise.all([fetchOwners(), fetchMoney()]);
+      setInitialLoading(false);
+    };
+    fetchInitialData();
   }, [filters]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return; // ⛔ جلوگیری از کلیک چندباره
+    if (loading) return;
     if (!ownerId || amount === "") return;
 
     setLoading(true);
@@ -76,7 +106,6 @@ export default function MoneyManager() {
 
       resetForm();
       fetchMoney();
-      fetchSummary();
       setShowForm(false);
     } catch (err) {
       console.error(err);
@@ -85,7 +114,6 @@ export default function MoneyManager() {
       setLoading(false);
     }
   };
-
 
   const resetForm = () => {
     setOwnerId("");
@@ -109,11 +137,11 @@ export default function MoneyManager() {
     try {
       await axios.delete(`${BASE_URL}/money/${id}`);
       fetchMoney();
-      fetchSummary();
     } catch (err) {
       alert(err.response?.data?.message || "خطا در حذف تراکنش");
     }
   };
+  
   // 🔹 Get owner name by ID
   const getOwnerName = (ownerId) => {
     const owner = owners.find(o => o.id == ownerId);
@@ -121,6 +149,17 @@ export default function MoneyManager() {
   };
 
   const totalAmount = moneyList.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+
+  // 🔹 Initial loading screen
+  if (initialLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px]" dir="rtl">
+        <FaSpinner className="text-4xl text-cyan-800 animate-spin mb-4" />
+        <p className="text-gray-600">در حال بارگذاری اطلاعات تراکنش‌ها...</p>
+        <p className="text-sm text-gray-500 mt-2">لطفاً کمی صبر کنید</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -152,15 +191,13 @@ export default function MoneyManager() {
       {/* Summary Panel */}
       {showSummary && summary && (
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-lg p-6 animate-fadeIn">
-
-
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500">مجموع مبلغ</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {summary.totalAmount.toLocaleString()} <span className="text-sm">افغانی</span>
+                    {summary.totalAmount?.toLocaleString() || 0} <span className="text-sm">افغانی</span>
                   </p>
                 </div>
                 <div className="p-2 bg-green-100 rounded-lg">
@@ -175,7 +212,7 @@ export default function MoneyManager() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500">تعداد کل تراکنش‌ها</p>
-                  <p className="text-2xl font-bold text-blue-600">{summary.totalRecords}</p>
+                  <p className="text-2xl font-bold text-blue-600">{summary.totalRecords || 0}</p>
                 </div>
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -189,7 +226,7 @@ export default function MoneyManager() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500">تراکنش‌های محاسبه‌ای</p>
-                  <p className="text-2xl font-bold text-purple-600">{summary.calculatedRecords}</p>
+                  <p className="text-2xl font-bold text-purple-600">{summary.calculatedRecords || 0}</p>
                 </div>
                 <div className="p-2 bg-purple-100 rounded-lg">
                   <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -203,7 +240,7 @@ export default function MoneyManager() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500">تراکنش‌های دستی</p>
-                  <p className="text-2xl font-bold text-amber-600">{summary.manualRecords}</p>
+                  <p className="text-2xl font-bold text-amber-600">{summary.manualRecords || 0}</p>
                 </div>
                 <div className="p-2 bg-amber-100 rounded-lg">
                   <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -215,7 +252,6 @@ export default function MoneyManager() {
           </div>
         </div>
       )}
-
 
       {/* فرم */}
       {showForm && (
@@ -242,19 +278,25 @@ export default function MoneyManager() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   مالک
                 </label>
-                <select
-                  value={ownerId}
-                  onChange={(e) => setOwnerId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors bg-white"
-                  required
-                >
-                  <option value="">انتخاب مالک</option>
-                  {owners.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
+                {ownersLoading ? (
+                  <div className="flex items-center justify-center h-12 bg-gray-100 rounded-lg">
+                    <FaSpinner className="animate-spin text-gray-400" />
+                  </div>
+                ) : (
+                  <select
+                    value={ownerId}
+                    onChange={(e) => setOwnerId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors bg-white"
+                    required
+                  >
+                    <option value="">انتخاب مالک</option>
+                    {owners.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -288,25 +330,7 @@ export default function MoneyManager() {
               >
                 {loading ? (
                   <>
-                    <svg
-                      className="animate-spin h-5 w-5 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                      />
-                    </svg>
+                    <FaSpinner className="animate-spin h-5 w-5 text-white" />
                     در حال ذخیره...
                   </>
                 ) : (
@@ -323,7 +347,6 @@ export default function MoneyManager() {
                   </>
                 )}
               </button>
-
 
               {(editingId || showForm) && (
                 <button
@@ -355,115 +378,123 @@ export default function MoneyManager() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-right py-4 px-6 font-semibold text-gray-700">مالک</th>
-                <th className="text-right py-4 px-6 font-semibold text-gray-700">مبلغ</th>
-                <th className="text-right py-4 px-6 font-semibold text-gray-700">تاریخ</th>
-                <th className="text-right py-4 px-6 font-semibold text-gray-700">عملیات</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {moneyList.map((item) => (
-                <tr
-                  key={item.id}
-                  className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${item.calculated ? 'bg-blue-50/50' : ''
-                    }`}
-                >
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.calculated ? 'bg-blue-100' : 'bg-cyan-100'
-                        }`}>
-                        <span className={`font-semibold ${item.calculated ? 'text-blue-600' : 'text-cyan-600'
-                          }`}>
-                          {item.owner?.name?.charAt(0) || "O"}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">{item.owner?.name || getOwnerName(item.ownerId)}</p>
-                        <p className="text-xs text-gray-500">شناسه: {item.id}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2" dir="ltr">
-                      <span className="text-gray-700 font-bold">
-                        {parseFloat(item.amount).toLocaleString()}
-                      </span>
-                      <span className="text-xs text-gray-500">افغانی</span>
-                    </div>
-                  </td>
-
-                  <td className="py-4 px-6">
-                    <div className="text-gray-600" dir="rtl">
-                      {new Date(item.createdAt).toLocaleDateString('eng-en', {
-                        year: 'numeric',
-                        month: 'numeric',
-                        day: 'numeric'
-                      })}
-                      <div className="text-xs text-gray-500 mt-1">
-                        {new Date(item.createdAt).toLocaleTimeString('fa-IR-u-nu-latn', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6">
-                    {currentUser.role == "admin" ? (<div className="flex items-center gap-2">
-
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className="p-2 text-cyan-700 hover:from-yellow-100 hover:to-yellow-200 transition-all"
-                        title="ویرایش"
-                      >
-                        <FaEdit />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="text-red-500"
-                        title="حذف"
-                      >
-                        <FaTrash />
-                      </button>
-
-                    </div>) : "--"}
-                  </td>
+        {/* Loading indicator for money list */}
+        {moneyLoading ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <FaSpinner className="text-3xl text-cyan-800 animate-spin mb-4" />
+            <p className="text-gray-600">در حال بارگذاری تراکنش‌ها...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-right py-4 px-6 font-semibold text-gray-700">مالک</th>
+                  <th className="text-right py-4 px-6 font-semibold text-gray-700">مبلغ</th>
+                  <th className="text-right py-4 px-6 font-semibold text-gray-700">تاریخ</th>
+                  <th className="text-right py-4 px-6 font-semibold text-gray-700">عملیات</th>
                 </tr>
-              ))}
+              </thead>
 
-              {moneyList.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="py-12 text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="p-4 bg-gray-100 rounded-full mb-4">
-                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-600 mb-2">هیچ تراکنشی یافت نشد</h3>
-                      <p className="text-gray-500 mb-4">با افزودن اولین تراکنش شروع کنید</p>
-                      <button
-                        onClick={() => setShowForm(true)}
-                        className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-lg hover:from-cyan-700 hover:to-cyan-600 transition-all"
-                      >
-                        <span className="flex items-center gap-2">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+              <tbody>
+                {moneyList.length > 0 ? (
+                  moneyList.map((item) => (
+                    <tr
+                      key={item.id}
+                      className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${item.calculated ? 'bg-blue-50/50' : ''
+                        }`}
+                    >
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.calculated ? 'bg-blue-100' : 'bg-cyan-100'
+                            }`}>
+                            <span className={`font-semibold ${item.calculated ? 'text-blue-600' : 'text-cyan-600'
+                              }`}>
+                              {item.owner?.name?.charAt(0) || "O"}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800">{item.owner?.name || getOwnerName(item.ownerId)}</p>
+                            <p className="text-xs text-gray-500">شناسه: {item.id}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2" dir="ltr">
+                          <span className="text-gray-700 font-bold">
+                            {parseFloat(item.amount || 0).toLocaleString()}
+                          </span>
+                          <span className="text-xs text-gray-500">افغانی</span>
+                        </div>
+                      </td>
+
+                      <td className="py-4 px-6">
+                        <div className="text-gray-600" dir="rtl">
+                          {new Date(item.createdAt).toLocaleDateString('eng-en', {
+                            year: 'numeric',
+                            month: 'numeric',
+                            day: 'numeric'
+                          })}
+                          <div className="text-xs text-gray-500 mt-1">
+                            {new Date(item.createdAt).toLocaleTimeString('fa-IR-u-nu-latn', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        {currentUser.role == "admin" ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleEdit(item)}
+                              className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg transition-colors"
+                              title="ویرایش"
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              title="حذف"
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        ) : "--"}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="py-12 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="p-4 bg-gray-100 rounded-full mb-4">
+                          <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                           </svg>
-                          افزودن اولین تراکنش
-                        </span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-600 mb-2">هیچ تراکنشی یافت نشد</h3>
+                        <p className="text-gray-500 mb-4">با افزودن اولین تراکنش شروع کنید</p>
+                        <button
+                          onClick={() => setShowForm(true)}
+                          className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-lg hover:from-cyan-700 hover:to-cyan-600 transition-all"
+                        >
+                          <span className="flex items-center gap-2">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            افزودن اولین تراکنش
+                          </span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
