@@ -7,12 +7,14 @@ import {
   updateReceipt,
   deleteReceipt,
   getReceiptStatistics,
-  getCustomerPaymentSummary
+  getCustomerPaymentSummary,
+  getReceiptsByDateRange
 } from '../Controllers/ReceiptController.js';
 
 const ReceiptRoute = express.Router();
 
 ReceiptRoute.post('/', createReceipt);
+ReceiptRoute.get("/date_range", getReceiptsByDateRange);
 ReceiptRoute.get('/', getAllReceipts);
 ReceiptRoute.get('/statistics', getReceiptStatistics);
 ReceiptRoute.get('/customer-summary/:customerId', getCustomerPaymentSummary);

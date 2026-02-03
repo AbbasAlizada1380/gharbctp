@@ -191,6 +191,81 @@ export const createReceipt = async (req, res) => {
   }
 };
 
+
+
+export const getReceiptsByDateRange = async (req, res) => {
+  const { from, to } = req.query;
+
+  if (!from || !to) {
+    return res.status(400).json({
+      message: "from and to dates are required",
+    });
+  }
+
+  try {
+    // Convert to full day range
+    const startDate = new Date(`${from}T00:00:00`);
+    const endDate = new Date(`${to}T23:59:59`);
+
+    const receipts = await Receipt.findAll({
+      where: {
+        createdAt: {
+          [Op.between]: [startDate, endDate],
+        },
+      },
+      include: [
+        {
+          model: Customer,
+          as: "Customer", // ⚠️ MUST match your association alias
+          attributes: ["id", "fullname"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    if (!receipts.length) {
+      return res.status(404).json({
+        message: "No receipts found in this date range",
+      });
+    }
+
+    // ===== Calculations =====
+    const totalAmount = receipts.reduce(
+      (sum, r) => sum + parseFloat(r.amount || 0),
+      0
+    );
+
+    const totalDistributed = receipts.reduce(
+      (sum, r) =>
+        sum +
+        (parseFloat(r.amount || 0) -
+          parseFloat(r.remainingAmount || 0)),
+      0
+    );
+
+    const totalRemaining = receipts.reduce(
+      (sum, r) => sum + parseFloat(r.remainingAmount || 0),
+      0
+    );
+
+    return res.status(200).json({
+      message: "Receipts fetched successfully",
+      totalCount: receipts.length,
+      totalAmount,
+      totalDistributed,
+      totalRemaining,
+      receipts,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Error fetching receipts",
+      error: error.message,
+    });
+  }
+};
+
 /* =====================================================
    GET ALL RECEIPTS (from Receipt table)
 ===================================================== */

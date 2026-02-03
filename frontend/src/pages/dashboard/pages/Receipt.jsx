@@ -22,6 +22,7 @@ import {
 } from "react-icons/fa";
 import Pagination from "../pagination/Pagination";
 import PrintBillOrder from "./PrintOrderBill";
+import ReceiptDateDownload from "./report/ReceiptDateDownload";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -84,7 +85,7 @@ const ReceiptManager = () => {
 
           if (res.data?.customers && res.data.customers.length > 0) {
             allCustomersData = [...allCustomersData, ...res.data.customers];
-            
+
             // بررسی آیا صفحه بیشتری وجود دارد
             const totalPages = res.data?.pagination?.totalPages || 1;
             if (page >= totalPages) {
@@ -274,9 +275,9 @@ const ReceiptManager = () => {
     if (customerSearch.trim() === "") {
       return allCustomers;
     }
-    
+
     const searchTerm = customerSearch.toLowerCase();
-    return allCustomers.filter(customer => 
+    return allCustomers.filter(customer =>
       customer.fullname?.toLowerCase().includes(searchTerm) ||
       customer.phoneNumber?.includes(customerSearch) ||
       customer.id?.toString().includes(customerSearch)
@@ -379,7 +380,7 @@ const ReceiptManager = () => {
             </div>
           </div>
         )}
-        
+
         {/* Toggle Filters Button */}
         <button
           onClick={() => setShowFilters(!showFilters)}
@@ -417,25 +418,25 @@ const ReceiptManager = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <span className="text-red-500">*</span> انتخاب مشتری
               </label>
-              
-              
-                  <div className="relative">
-                    <select
-                      name="customer"
-                      value={form.customer}
-                      onChange={handleChange}
-                      required
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition appearance-none"
-                    >
-                      <option value="">انتخاب مشتری</option>
-                      {allCustomers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.fullname || c.name} {c.phoneNumber ? `(${c.phoneNumber})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-             
+
+
+              <div className="relative">
+                <select
+                  name="customer"
+                  value={form.customer}
+                  onChange={handleChange}
+                  required
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition appearance-none"
+                >
+                  <option value="">انتخاب مشتری</option>
+                  {allCustomers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.fullname || c.name} {c.phoneNumber ? `(${c.phoneNumber})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
             </div>
 
             {/* Amount Input */}
@@ -521,26 +522,7 @@ const ReceiptManager = () => {
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
         {/* Table Header */}
         <div className="bg-gradient-to-r from-cyan-800 to-cyan-600 text-white p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-full">
-                <FaFileInvoiceDollar className="text-xl" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold">لیست رسیدها</h2>
-                <p className="text-sm text-white/80">
-                  {totalItems} رسید | صفحه {currentPage} از {totalPages}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition"
-            >
-              <FaFilter />
-              <span>فیلترها</span>
-            </button>
-          </div>
+          <ReceiptDateDownload />
         </div>
 
         {/* Table Content */}
