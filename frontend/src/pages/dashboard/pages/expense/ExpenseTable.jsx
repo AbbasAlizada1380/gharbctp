@@ -1,6 +1,7 @@
 import { useSelector } from "react-redux";
 import Pagination from "../../pagination/Pagination";
 import { FaEdit, FaTrash } from "react-icons/fa";
+import ExpenseDateDownload from "../report/ExpenseDateDownload";
 
 const ExpenseTable = ({
   expenses,
@@ -28,6 +29,7 @@ const ExpenseTable = ({
               <h2 className="text-xl font-bold">لیست هزینه‌ها</h2>
 
             </div>
+            <div><ExpenseDateDownload /></div>
           </div>
 
         </div>
@@ -116,7 +118,7 @@ const ExpenseTable = ({
                         onClick={() => onDelete(e.id)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
                         title="حذف"
-                      ><FaTrash/>
+                      ><FaTrash />
                       </button>
                     </div>) : "--"}
                   </td>

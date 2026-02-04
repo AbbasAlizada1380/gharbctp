@@ -1,5 +1,6 @@
 import Expense from "../Models/Expense.js";
 import sequelize from "../dbconnection.js";
+import { Op } from "sequelize";
 
 /* ==============================
    Create a new Expense
@@ -161,6 +162,45 @@ export const deleteExpense = async (req, res) => {
     console.error(error);
     res.status(500).json({
       message: "Error deleting expense",
+      error: error.message,
+    });
+  }
+};
+
+
+/* ==============================
+   Get Expenses by Date Range
+================================ */
+export const getExpensesByDateRange = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({ message: "Both 'from' and 'to' dates are required" });
+    }
+
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999); // include the entire end date
+
+    const expenses = await Expense.findAll({
+      where: {
+        createdAt: {
+          [Op.between]: [fromDate, toDate], // <-- use Op here
+        },
+      },
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json({
+      expenses,
+      totalCount: expenses.length,
+      totalAmount: expenses.reduce((sum, e) => sum + Number(e.amount), 0),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Error fetching expenses by date range",
       error: error.message,
     });
   }

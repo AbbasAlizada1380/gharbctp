@@ -5,6 +5,7 @@ import {
   getExpenseById,
   updateExpense,
   deleteExpense,
+  getExpensesByDateRange, // <-- import the new function
 } from "../Controllers/ExpenseController.js";
 
 const ExpenseRoute = express.Router();
@@ -14,6 +15,9 @@ ExpenseRoute.post("/", createExpense);
 
 // Get all expenses (with optional pagination)
 ExpenseRoute.get("/", getExpenses);
+
+// Get expenses by date range
+ExpenseRoute.get("/date_range", getExpensesByDateRange);
 
 // Get a single expense by ID
 ExpenseRoute.get("/:id", getExpenseById);
