@@ -38,20 +38,34 @@ const Navbar = () => {
 
   useEffect(() => {
     const updateDate = () => {
-      const now = moment();
-      const jMonthIndex = now.jMonth();
-      const shamsiMonthName = shamsiMonths[jMonthIndex];
+      const now = moment().local("en"); // keep Gregorian calendar
+
+      // Map Gregorian weekdays to Dari
+      const weekdaysDari = {
+        Sunday: "یک‌شنبه",
+        Monday: "دوشنبه",
+        Tuesday: "سه‌شنبه",
+        Wednesday: "چهارشنبه",
+        Thursday: "پنج‌شنبه",
+        Friday: "جمعه",
+        Saturday: "شنبه",
+      };
+
+      const gregorianDay = now.format("dddd"); // e.g., Monday
+      const dariDay = weekdaysDari[gregorianDay]; // e.g., دوشنبه
 
       const newDateInfo = {
-        day: now.format("dddd"),
-        year: now.format("jYYYY"),
-        month: shamsiMonthName,
-        dateNumber: now.format("jD"),
-        time: now.format("HH:mm"),
+        day: dariDay,                // Day in Dari
+        year: now.format("YYYY"),    // Year in English numbers
+        month: now.format("M"),      // Month number in English
+        dateNumber: now.format("D"), // Day of month in English
+        time: now.format("HH:mm"),   // Time in 24h format
       };
 
       setDateInfo(newDateInfo);
     };
+
+
 
     updateDate();
     const timer = setInterval(updateDate, 60000);
@@ -116,8 +130,8 @@ const Navbar = () => {
                 <p className="text-xl font-bold text-cyan-800">
                   {dateInfo.day}
                 </p>
-                <p className="text-sm text-gray-600 font-medium">
-                  {dateInfo.dateNumber} {dateInfo.month} {dateInfo.year}
+                <p className=" text-gray-600 font-bold ">
+                  {dateInfo.dateNumber}/{dateInfo.month}/{dateInfo.year}
                 </p>
               </div>
             </div>
@@ -162,9 +176,8 @@ const Navbar = () => {
                 <div className="hidden lg:block text-right">
                   <p className="text-sm font-semibold text-gray-800 group-hover:text-cyan-800">
                     {currentUser
-                      ? `${currentUser.first_name || ""} ${
-                          currentUser.last_name || ""
-                        }`
+                      ? `${currentUser.first_name || ""} ${currentUser.last_name || ""
+                      }`
                       : "بارگذاری..."}
                   </p>
                   <p className="text-xs text-gray-500 capitalize">
@@ -173,9 +186,8 @@ const Navbar = () => {
                 </div>
 
                 <FaChevronDown
-                  className={`text-gray-400 transition-transform duration-200 ${
-                    isProfileDropdownOpen ? "rotate-180" : ""
-                  }`}
+                  className={`text-gray-400 transition-transform duration-200 ${isProfileDropdownOpen ? "rotate-180" : ""
+                    }`}
                   size={12}
                 />
               </div>

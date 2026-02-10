@@ -15,7 +15,13 @@ const OrderItem = sequelize.define(
         min: 1,
       },
     },
+    customerName: {
+      type: DataTypes.STRING,
+    },
     fileName: {
+      type: DataTypes.STRING,
+    },
+    invoiceNumber: {
       type: DataTypes.STRING,
     },
     price: {
@@ -29,7 +35,8 @@ const OrderItem = sequelize.define(
       type: DataTypes.DECIMAL(10, 2),
       validate: {
         min: 0,
-      }},
+      }
+    },
     receipt: {
       type: DataTypes.DECIMAL(10, 2),
       validate: {

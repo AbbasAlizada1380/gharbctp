@@ -45,7 +45,7 @@ const DashboardHome = () => {
   };
 
   const money = (val) =>
-    new Intl.NumberFormat("fa-AF").format(Math.round(val || 0)) + " افغانی";
+    new Intl.NumberFormat("en").format(Math.round(val || 0)) + " افغانی";
 
   if (loading) {
     return (

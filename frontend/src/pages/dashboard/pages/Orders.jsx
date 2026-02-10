@@ -125,6 +125,7 @@ const Orders = () => {
     };
 
     try {
+      console.log(payload);
       setSubmitting(true); // 🔒 قفل دکمه
 
       await axios.post(`${BASE_URL}/orderItems`, payload);
@@ -249,7 +250,7 @@ const Orders = () => {
       </div>
 
       {/* Pass the refreshTrigger prop */}
-     <div className="mt-4"> <OrderItemsList refreshTrigger={refreshTrigger} /></div>
+      <div className="mt-4"> <OrderItemsList refreshTrigger={refreshTrigger} /></div>
     </div>
   );
 };

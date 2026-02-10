@@ -367,6 +367,8 @@ const OrderItemsList = ({
               <th className="p-3 border-b font-semibold">نام فایل</th>
               <th className="p-3 border-b font-semibold">سایز</th>
               <th className="p-3 border-b font-semibold">تعداد</th>
+              <th className="p-3 border-b font-semibold">نمبر بیل</th>
+              <th className="p-3 border-b font-semibold">نام مشتری</th>
               <th className="p-3 border-b font-semibold">قیمت (افغانی)</th>
               <th className="p-3 border-b font-semibold">مبلغ (افغانی)</th>
               <th className="p-3 border-b font-semibold">
@@ -465,6 +467,16 @@ const OrderItemsList = ({
                         {item.qnty}
                       </span>
                     )}
+                  </td>
+                  <td className="p-3">
+                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
+                      {item.invoiceNumber || 0}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
+                      {item.customerName}
+                    </span>
                   </td>
 
                   {/* Price Cell */}
@@ -584,14 +596,14 @@ const OrderItemsList = ({
         </div>
       )}
 
-    
-        <div className="p-6 border-t border-gray-200">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={(page) => setCurrentPage(page)}
-          />
-        </div>
+
+      <div className="p-6 border-t border-gray-200">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      </div>
 
 
       {/* Editing Warning */}

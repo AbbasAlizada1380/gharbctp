@@ -11,6 +11,8 @@ export const createOrderItem = async (req, res) => {
   try {
     let { customer, newCustomerName, orderItems } = req.body;
 
+    console.log("Received data:", req.body); // Add this for debugging
+
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
       return res.status(400).json({
         message: "orderItems are required",
@@ -47,13 +49,22 @@ export const createOrderItem = async (req, res) => {
     const createdOrderItems = [];
 
     for (const item of orderItems) {
-      const { size, qnty, price, money, fileName } = item;
+      const { size, qnty, price, money, fileName, invoiceNumber } = item; // <-- Add invoiceNumber here
 
       if (!size || !qnty || !price) {
         throw new Error("Each order item must have size, qnty and price");
       }
 
       const quantity = Number(qnty);
+      const itemPrice = Number(price);
+
+      // Validate numbers
+      if (isNaN(quantity) || quantity <= 0) {
+        throw new Error(`Invalid quantity: ${qnty}`);
+      }
+      if (isNaN(itemPrice) || itemPrice <= 0) {
+        throw new Error(`Invalid price: ${price}`);
+      }
 
       // Check stock availability
       const companyStock = await CompanyStock.findOne({
@@ -67,6 +78,10 @@ export const createOrderItem = async (req, res) => {
       }
 
       const currentStock = parseInt(companyStock.quantity);
+      if (isNaN(currentStock)) {
+        throw new Error(`Invalid stock quantity for size ${size}`);
+      }
+
       if (currentStock < quantity) {
         throw new Error(`Insufficient stock for size ${size}. Available: ${currentStock}, Requested: ${quantity}`);
       }
@@ -80,21 +95,39 @@ export const createOrderItem = async (req, res) => {
 
     // 🔹 3. Process order items and update stock
     for (const item of orderItems) {
-      const { size, qnty, price, money, fileName } = item;
+      const { size, qnty, price, money, fileName, invoiceNumber } = item; // <-- Add invoiceNumber here too
       const quantity = Number(qnty);
+      const itemPrice = Number(price);
 
-      // Update company stock
+      // Find the stock item for this size
       const stockItem = stockUpdates.find(s => s.size === size);
-      if (stockItem) {
-        const newQuantity = parseInt(stockItem.companyStock.quantity) - quantity;
+      if (!stockItem) {
+        throw new Error(`Stock information not found for size ${size}`);
+      }
 
-        await stockItem.companyStock.update(
-          {
-            quantity: newQuantity.toString(),
-            money: (newQuantity * Number(stockItem.companyStock.price)).toString() // Assuming price is stored
-          },
-          { transaction }
-        );
+      // Calculate new quantity
+      const currentQuantity = parseInt(stockItem.companyStock.quantity);
+      const newQuantity = currentQuantity - quantity;
+
+      // Validate calculations
+      if (isNaN(newQuantity) || newQuantity < 0) {
+        throw new Error(`Invalid quantity calculation for size ${size}`);
+      }
+
+      // Update company stock - only update quantity
+      await stockItem.companyStock.update(
+        {
+          quantity: newQuantity.toString(),
+        },
+        { transaction }
+      );
+
+      // Calculate order item money
+      let orderItemMoney;
+      if (money && !isNaN(Number(money)) && Number(money) > 0) {
+        orderItemMoney = Number(money);
+      } else {
+        orderItemMoney = quantity * itemPrice;
       }
 
       // Create order item
@@ -102,10 +135,12 @@ export const createOrderItem = async (req, res) => {
         {
           size,
           qnty: quantity,
-          price: Number(price),
-          money: money ? Number(money) : quantity * Number(price),
-          fileName,
+          price: itemPrice,
+          money: orderItemMoney,
+          fileName: fileName || null,
           customerId,
+          invoiceNumber: invoiceNumber || null, // <-- Use invoiceNumber from item
+          customerName: customerRecord.fullname,
         },
         { transaction }
       );
@@ -146,9 +181,10 @@ export const createOrderItem = async (req, res) => {
     // 🔹 6. Log stock changes
     const stockChangeLogs = [];
     for (const update of stockUpdates) {
+      const previousQuantity = parseInt(update.companyStock.quantity) + update.quantity;
       stockChangeLogs.push({
         size: update.size,
-        previousQuantity: parseInt(update.companyStock.quantity) + update.quantity,
+        previousQuantity,
         newQuantity: parseInt(update.companyStock.quantity),
         change: -update.quantity
       });
@@ -174,16 +210,16 @@ export const createOrderItem = async (req, res) => {
 
     // Determine appropriate status code
     let statusCode = 500;
-    if (error.message.includes("not found") || error.message.includes("Insufficient stock")) {
+    if (error.message.includes("not found") ||
+      error.message.includes("Insufficient stock") ||
+      error.message.includes("Invalid")) {
       statusCode = 400;
     }
 
     res.status(statusCode).json({
       message: "Error creating order",
       error: error.message,
-      details: error.message.includes("stock") ?
-        "Check available stock quantities before placing order" :
-        "Please verify all required fields are correct"
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
