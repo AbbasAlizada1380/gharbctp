@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import jalaali from "jalaali-js";
+import VazirmatnTTF from "../../../../public/ttf/Vazirmatn.js";
 
 const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
   const hasPrinted = useRef(false);
@@ -93,7 +94,7 @@ const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
             className="bg-white text-black p-8 shadow-2xl border border-gray-200"
             style={{
               direction: "rtl",
-              fontFamily: "'Tahoma', 'Segoe UI', Arial, sans-serif",
+              fontFamily: "'Vazirmatn', 'Tahoma', 'Segoe UI', Arial, sans-serif",
               margin: "0 auto",
               borderRadius: "8px",
               background: "linear-gradient(to bottom, #ffffff, #f9fafb)"
@@ -140,29 +141,28 @@ const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
             </div>
 
             {/* Main Content */}
-            <div className="text-sm leading-8 mt-6 p-5 border-2 border-gray-200 bg-gradient-to-b from-blue-50 to-white rounded-lg shadow-sm">
+            <div className="text-sm leading-8 mt-6 p-5 border-2 border-gray-200  rounded-lg shadow-sm">
               <p className="text-sm text-justify bg-white p-4 rounded border border-gray-100">
                 آقای/خانم
-                <strong className="text-blue-800 mx-1 px-2 py-1 bg-blue-50 rounded">
-                  {customer.fullname || "................"}
-                </strong>
+               <span className="font-bold text-md"> {customer.fullname || "................"} </span>
+               
                 با شماره ثبت
-                <strong className="text-green-700 mx-1 px-2 py-1 bg-green-50 rounded">
+                <span className=" mx-1 px-2 py-1 rounded">
                   {customer.id || "................"}
-                </strong>
+                </span>
                 مبلغ
-                <strong className="text-red-700 mx-1 px-2 py-1 bg-red-50 rounded">
+                <strong className="text-green-700 mx-1 px-2 py-1 rounded">
                   {order.amount?.toLocaleString("fa-AF") || "................"} افغانی
                 </strong>
                 (به حروف:
-                <strong className="text-purple-700 mx-1 px-2 py-1 bg-purple-50 rounded">
+                <strong className=" mx-1 px-2 py-1  rounded">
                   {convertNumberToPersianWords(order.amount) || "................"}
                 </strong>)
                 را در تاریخ
-                <strong className="text-teal-700 mx-1 px-2 py-1 bg-teal-50 rounded">
+                <strong className=" mx-1 px-2 py-1 rounded">
                   {formatToJalali(order.createdAt) || "................"}
                 </strong>
-                به دفتر <strong className="text-blue-900">غرب CTP</strong> بابت کرایه پلیت های کشیده شده شان پرداخت نمود.
+                به دفتر <strong className="">غرب CTP</strong> بابت کرایه پلیت های کشیده شده شان پرداخت نمود.
               </p>
             </div>
 
@@ -188,8 +188,8 @@ const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
                   </p>
                 </div>
                 <div className="mt-2 bg-gradient-to-r from-blue-50 to-cyan-50 p-2 rounded border border-blue-100">
-                  <p className="text-xs font-bold text-gray-800">صدور شده توسط سیستم اتوماسیون اداری</p>
-                  <p className="text-xs text-gray-600 mt-1">کد رهگیری:
+                  <p className="text-xs font-bold text-gray-800">صادر شده توسط سیستم اتوماتیک اداری</p>
+                  <p className="text-xs text-gray-600 mt-1">نمبر رسید:
                     <span className="font-bold text-blue-700"> SYS-{receiptNo}</span>
                   </p>
                 </div>
@@ -229,7 +229,16 @@ const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
       </div>
 
       {/* Print-specific styles */}
-      <style jsx global>{`@media print {
+      <style jsx global>{`
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url(${VazirmatnTTF}) format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@media print {
   html, body {
     width: 100%;
     height: 100%;
@@ -267,6 +276,7 @@ const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
     border-radius: 0 !important;
     box-shadow: none !important;
     transform: none !important;
+    font-family: 'Vazirmatn', 'Tahoma', 'Segoe UI', Arial, sans-serif !important;
   }
 
   button,

@@ -75,7 +75,7 @@ const DateOrderDownload = () => {
       );
 
       const headers = [
-        ["باقیمانده", "دریافتی", "مبلغ", "مشتری", "تعداد", "نام فایل", "سایز", "تاریخ", "شماره"]
+        ["باقیمانده", "دریافتی", "مبلغ", "مشتری","نمبر بیل", "تعداد", "نام فایل", "سایز", "تاریخ", "شماره"]
       ];
 
       const body = items.map((item) => [
@@ -83,6 +83,7 @@ const DateOrderDownload = () => {
         (item.receipt || 0),
         (item.money),
         (item.customerName),
+        (item.invoiceNumber),
         (item.qnty),
         (item.fileName),
         (item.size),
