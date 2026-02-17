@@ -429,8 +429,8 @@ const Incoming = () => {
                   <tr>
                     <th className="p-3 border-b font-semibold">#</th>
                     <th className="p-3 border-b font-semibold">اندازه</th>
-                    <th className="p-3 border-b font-semibold">تعداد (کارتن)</th>
-                    <th className="p-3 border-b font-semibold">قیمت کارتن (افغانی)</th>
+                    <th className="p-3 border-b font-semibold">تعداد (پلیت)</th>
+                    <th className="p-3 border-b font-semibold">قیمت پلیت (افغانی)</th>
                     <th className="p-3 border-b font-semibold">مبلغ کل (افغانی)</th>
                     <th className="p-3 border-b font-semibold">مصرف شده</th>
                     <th className="p-3 border-b font-semibold">موجودی</th>

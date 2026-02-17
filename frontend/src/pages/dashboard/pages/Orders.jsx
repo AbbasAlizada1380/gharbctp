@@ -13,7 +13,8 @@ const createEmptyOrderItems = (count = 5) => {
     qnty: "",
     price: "",
     money: "",
-    fileName: ""
+    fileName: "",
+    invoiceNumber:""
   }));
 };
 
@@ -125,7 +126,6 @@ const Orders = () => {
     };
 
     try {
-      console.log(payload);
       setSubmitting(true); // 🔒 قفل دکمه
 
       await axios.post(`${BASE_URL}/orderItems`, payload);

@@ -400,7 +400,7 @@ const Outgoing = () => {
                   <tr>
                     <th className="p-3 border-b font-semibold">#</th>
                     <th className="p-3 border-b font-semibold">اندازه</th>
-                    <th className="p-3 border-b font-semibold">تعداد (کارتن)</th>
+                    <th className="p-3 border-b font-semibold">تعداد (پلیت)</th>
                     <th className="p-3 border-b font-semibold">قیمت واحد (میانگین)</th>
                     <th className="p-3 border-b font-semibold">مبلغ کل (افغانی)</th>
                     <th className="p-3 border-b font-semibold">تاریخ</th>

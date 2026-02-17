@@ -174,7 +174,6 @@ const ExistingStock = () => {
                 <tr>
                   <th className="p-3 border-b font-semibold">#</th>
                   <th className="p-3 border-b font-semibold">اندازه</th>
-                  <th className="p-3 border-b font-semibold">تعداد (کارتن)</th>
                   <th className="p-3 border-b font-semibold">تعداد (پلیت)</th>
                   <th className="p-3 border-b font-semibold">وضعیت</th>
                   <th className="p-3 border-b font-semibold">آخرین به‌روزرسانی</th>
@@ -199,16 +198,6 @@ const ExistingStock = () => {
                       <td className="p-3">
                         <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm font-medium">
                           {getSizeLabel(item.size)}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-sm font-bold ${quantity > 50
-                            ? 'bg-green-100 text-green-800'
-                            : quantity > 10
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                          {quantity.toLocaleString('en-US')}
                         </span>
                       </td>
                       <td className="p-3">

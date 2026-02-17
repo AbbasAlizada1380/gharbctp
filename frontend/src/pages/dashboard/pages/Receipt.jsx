@@ -18,7 +18,8 @@ import {
   FaFilter,
   FaChevronDown,
   FaChevronUp,
-  FaSearch
+  FaSearch,
+  FaInfoCircle
 } from "react-icons/fa";
 import Pagination from "../pagination/Pagination";
 import PrintBillOrder from "./PrintOrderBill";
@@ -33,8 +34,8 @@ const initialForm = {
 };
 
 const ReceiptManager = () => {
-  const [customers, setCustomers] = useState([]);
-  const [allCustomers, setAllCustomers] = useState([]);
+  const [customersWithRemaining, setCustomersWithRemaining] = useState([]);
+  const [selectedCustomerDetails, setSelectedCustomerDetails] = useState(null);
   const [receipts, setReceipts] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
@@ -59,58 +60,32 @@ const ReceiptManager = () => {
   const [filterCustomer, setFilterCustomer] = useState("");
 
   // Customer fetch state
-  const [loadingAllCustomers, setLoadingAllCustomers] = useState(false);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
-  const [showAllCustomers, setShowAllCustomers] = useState(false);
+  const [grandTotalRemaining, setGrandTotalRemaining] = useState(0);
 
   // Original values for reset during edit
   const [originalReceipt, setOriginalReceipt] = useState(null);
 
-  /* ---------------- FETCH ALL CUSTOMERS (ALL PAGES) ---------------- */
-  const fetchAllCustomers = async () => {
+  /* ---------------- FETCH CUSTOMERS WITH REMAINING MONEY ---------------- */
+  const fetchCustomersWithRemaining = async () => {
     try {
-      setLoadingAllCustomers(true);
-      let allCustomersData = [];
-      let page = 1;
-      let hasMorePages = true;
+      setLoadingCustomers(true);
+      const response = await axios.get(`${BASE_URL}/remain/customer`);
 
-      while (hasMorePages) {
-        try {
-          const res = await axios.get(`${BASE_URL}/customers`, {
-            params: {
-              page,
-              limit: 1000
-            }
-          });
-
-          if (res.data?.customers && res.data.customers.length > 0) {
-            allCustomersData = [...allCustomersData, ...res.data.customers];
-
-            // بررسی آیا صفحه بیشتری وجود دارد
-            const totalPages = res.data?.pagination?.totalPages || 1;
-            if (page >= totalPages) {
-              hasMorePages = false;
-            } else {
-              page++;
-            }
-          } else {
-            hasMorePages = false;
-          }
-        } catch (err) {
-          console.error(`Error fetching customers page ${page}:`, err);
-          hasMorePages = false;
-        }
+      if (response.data?.customers) {
+        setCustomersWithRemaining(response.data.customers);
+        setGrandTotalRemaining(response.data.grandTotalRemaining || 0);
+      } else {
+        setCustomersWithRemaining([]);
+        setGrandTotalRemaining(0);
       }
-
-      setAllCustomers(allCustomersData);
-      // همچنین برای backward compatibility
-      setCustomers(allCustomersData);
-      return allCustomersData;
     } catch (error) {
-      console.error("Error fetching all customers", error);
-      return [];
+      console.error("Error fetching customers with remaining money", error);
+      setCustomersWithRemaining([]);
+      setGrandTotalRemaining(0);
     } finally {
-      setLoadingAllCustomers(false);
+      setLoadingCustomers(false);
     }
   };
 
@@ -147,16 +122,37 @@ const ReceiptManager = () => {
   };
 
   useEffect(() => {
-    fetchAllCustomers();
+    fetchCustomersWithRemaining();
   }, []);
 
   useEffect(() => {
     fetchReceipts();
   }, [currentPage, perPage, filterCalculated, filterCustomer]);
 
+  /* ---------------- HANDLE CUSTOMER SELECT ---------------- */
+  const handleCustomerSelect = (e) => {
+    const customerId = e.target.value;
+    setForm(prev => ({
+      ...prev,
+      customer: customerId
+    }));
+
+    // Find and set selected customer details
+    if (customerId) {
+      const selected = customersWithRemaining.find(
+        c => c.customer.id.toString() === customerId.toString()
+      );
+      setSelectedCustomerDetails(selected || null);
+    } else {
+      setSelectedCustomerDetails(null);
+    }
+  };
+
   /* ---------------- PRINT RECEIPT ---------------- */
   const handlePrintReceipt = (receipt) => {
-    const customerData = allCustomers.find(c => c.id.toString() === receipt.customer.toString());
+    const customerData = customersWithRemaining.find(
+      c => c.customer.id.toString() === receipt.customer.toString()
+    )?.customer;
 
     const orderForPrint = {
       id: receipt.id,
@@ -166,7 +162,6 @@ const ReceiptManager = () => {
       Customer: customerData || {
         id: receipt.customer,
         fullname: getCustomerName(receipt.customer),
-        phoneNumber: customerData?.phoneNumber || customerData?.phone || null
       }
     };
 
@@ -199,6 +194,12 @@ const ReceiptManager = () => {
     e.preventDefault();
     if (loading) return;
 
+    // Validate amount doesn't exceed remaining money
+    if (selectedCustomerDetails && parseFloat(form.amount) > selectedCustomerDetails.remainingMoney) {
+      setError(`مبلغ وارد شده (${form.amount}) از باقیمانده قابل پرداخت (${selectedCustomerDetails.remainingMoney}) بیشتر است`);
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -218,7 +219,9 @@ const ReceiptManager = () => {
       setForm(initialForm);
       setEditingId(null);
       setOriginalReceipt(null);
+      setSelectedCustomerDetails(null);
       fetchReceipts();
+      fetchCustomersWithRemaining(); // Refresh remaining money data
 
       alert(editingId ? "رسید با موفقیت ویرایش شد" : "رسید با موفقیت ثبت شد");
     } catch (error) {
@@ -234,6 +237,7 @@ const ReceiptManager = () => {
     setForm(initialForm);
     setEditingId(null);
     setOriginalReceipt(null);
+    setSelectedCustomerDetails(null);
   };
 
   /* ---------------- RESET FORM ---------------- */
@@ -244,6 +248,12 @@ const ReceiptManager = () => {
         amount: originalReceipt.amount.toString(),
         calculated: originalReceipt.calculated || false,
       });
+
+      // Reset selected customer details
+      const selected = customersWithRemaining.find(
+        c => c.customer.id.toString() === originalReceipt.customer.toString()
+      );
+      setSelectedCustomerDetails(selected || null);
     }
   };
 
@@ -264,23 +274,33 @@ const ReceiptManager = () => {
     );
   };
 
-  // Get customer name from all customers
+  // Get customer name from customers with remaining
   const getCustomerName = (customerId) => {
-    const customer = allCustomers.find(c => c.id.toString() === customerId.toString());
-    return customer?.fullname || customer?.name || "مشتری ناشناس";
+    const customerData = customersWithRemaining.find(
+      c => c.customer.id.toString() === customerId.toString()
+    );
+    return customerData?.customer?.fullname || "مشتری ناشناس";
+  };
+
+  // Get remaining money for a customer
+  const getCustomerRemainingMoney = (customerId) => {
+    const customerData = customersWithRemaining.find(
+      c => c.customer.id.toString() === customerId.toString()
+    );
+    return customerData?.remainingMoney || 0;
   };
 
   // Filter customers based on search
   const getFilteredCustomers = () => {
     if (customerSearch.trim() === "") {
-      return allCustomers;
+      return customersWithRemaining;
     }
 
     const searchTerm = customerSearch.toLowerCase();
-    return allCustomers.filter(customer =>
-      customer.fullname?.toLowerCase().includes(searchTerm) ||
-      customer.phoneNumber?.includes(customerSearch) ||
-      customer.id?.toString().includes(customerSearch)
+    return customersWithRemaining.filter(item =>
+      item.customer.fullname?.toLowerCase().includes(searchTerm) ||
+      item.customer.phoneNumber?.includes(customerSearch) ||
+      item.customer.id?.toString().includes(searchTerm)
     );
   };
 
@@ -296,9 +316,8 @@ const ReceiptManager = () => {
   const calculatedAmount = receipts.filter(r => r.calculated).reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
   const manualAmount = receipts.filter(r => !r.calculated).reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
 
-  // Get customers for display in select (with search and pagination)
+  // Get customers for display in select
   const displayCustomers = getFilteredCustomers();
-  const limitedCustomers = showAllCustomers ? displayCustomers : displayCustomers.slice(0, 20);
 
   if (fetchLoading && receipts.length === 0) {
     return (
@@ -311,10 +330,18 @@ const ReceiptManager = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6 space-y-8">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">مدیریت رسیدها</h1>
-        <p className="text-gray-600">ثبت و مدیریت رسیدهای پرداختی</p>
+      {/* Header with Grand Total Remaining */}
+      <div className="bg-gradient-to-r from-cyan-800 to-cyan-600 text-white p-6 rounded-xl shadow-lg">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">مدیریت رسیدها</h1>
+            <p className="text-white/80">ثبت و مدیریت رسیدهای پرداختی</p>
+          </div>
+          <div className="bg-white/20 p-4 rounded-lg text-center">
+            <p className="text-sm text-white/80">مجموع باقیمانده</p>
+            <p className="text-2xl font-bold">{grandTotalRemaining.toLocaleString('en-US')} افغانی</p>
+          </div>
+        </div>
       </div>
 
       {/* Filters Section */}
@@ -333,9 +360,9 @@ const ReceiptManager = () => {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2"
                 >
                   <option value="">همه مشتریان</option>
-                  {allCustomers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.fullname || c.name}
+                  {customersWithRemaining.map((item) => (
+                    <option key={item.customer.id} value={item.customer.id}>
+                      {item.customer.fullname} (باقیمانده: {item.remainingMoney.toLocaleString('en-US')})
                     </option>
                   ))}
                 </select>
@@ -347,7 +374,7 @@ const ReceiptManager = () => {
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-blue-800">مجموع مبلغ</p>
+                    <p className="text-sm text-blue-800">مجموع مبلغ رسیدها</p>
                     <p className="text-xl font-bold text-blue-900">
                       {totalAmount.toLocaleString('en-US')} افغانی
                     </p>
@@ -415,28 +442,31 @@ const ReceiptManager = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Customer Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <span className="text-red-500">*</span> انتخاب مشتری
-              </label>
-
-
-              <div className="relative">
+              <div className="space-y-3">
+                {/* Customer Select */}
                 <select
                   name="customer"
                   value={form.customer}
-                  onChange={handleChange}
+                  onChange={handleCustomerSelect}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition appearance-none"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                 >
                   <option value="">انتخاب مشتری</option>
-                  {allCustomers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.fullname || c.name} {c.phoneNumber ? `(${c.phoneNumber})` : ''}
+                  {displayCustomers.map((item) => (
+                    <option key={item.customer.id} value={item.customer.id}>
+                      {item.customer.fullname} 
                     </option>
                   ))}
                 </select>
-              </div>
 
+                {/* Loading indicator */}
+                {loadingCustomers && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <FaSpinner className="animate-spin" />
+                    <span>در حال بارگذاری مشتریان...</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Amount Input */}
@@ -456,12 +486,24 @@ const ReceiptManager = () => {
                   placeholder="مبلغ را وارد کنید"
                   required
                   min="0"
+                  max={selectedCustomerDetails?.remainingMoney || undefined}
                   step="0.01"
                   className="w-full border border-gray-300 rounded-lg px-10 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                 />
               </div>
+              {selectedCustomerDetails && (
+                <p className="mt-2 text-sm text-gray-500">
+                  حداکثر مبلغ قابل پرداخت: {selectedCustomerDetails.remainingMoney.toLocaleString('en-US')} افغانی
+                </p>
+              )}
             </div>
 
+            {/* Error Display */}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
@@ -533,6 +575,7 @@ const ReceiptManager = () => {
                 <th className="p-3 border-b font-semibold">#</th>
                 <th className="p-3 border-b font-semibold">مشتری</th>
                 <th className="p-3 border-b font-semibold">مبلغ (افغانی)</th>
+                <th className="p-3 border-b font-semibold">باقیمانده</th>
                 <th className="p-3 border-b font-semibold">تاریخ ثبت</th>
                 <th className="p-3 border-b font-semibold">عملیات</th>
               </tr>
@@ -540,7 +583,7 @@ const ReceiptManager = () => {
             <tbody>
               {receipts.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="p-8">
+                  <td colSpan="6" className="p-8">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <FaFileInvoiceDollar className="text-4xl text-gray-300" />
                       <p className="text-lg text-gray-500">هیچ رسیدی یافت نشد</p>
@@ -549,67 +592,77 @@ const ReceiptManager = () => {
                   </td>
                 </tr>
               ) : (
-                receipts.map((receipt, index) => (
-                  <tr
-                    key={receipt.id}
-                    className={`
-                      border-b last:border-0 transition-colors
-                      hover:bg-gray-50
-                      ${editingId === receipt.id ? "bg-yellow-50" : ""}
-                      ${receipt.calculated ? "bg-blue-50/40" : ""}
-                    `}
-                  >
-                    {/* ID */}
-                    <td className="p-3 text-gray-600 font-medium">
-                      {receipt.id}
-                    </td>
+                receipts.map((receipt, index) => {
+                  const remainingMoney = getCustomerRemainingMoney(receipt.customer);
+                  return (
+                    <tr
+                      key={receipt.id}
+                      className={`
+                        border-b last:border-0 transition-colors
+                        hover:bg-gray-50
+                        ${editingId === receipt.id ? "bg-yellow-50" : ""}
+                        ${receipt.calculated ? "bg-blue-50/40" : ""}
+                      `}
+                    >
+                      {/* ID */}
+                      <td className="p-3 text-gray-600 font-medium">
+                        {receipt.id}
+                      </td>
 
-                    {/* Customer */}
-                    <td className="p-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-gray-800">
-                          {getCustomerName(receipt.customer)}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          کد: {receipt.customer}
-                        </span>
-                      </div>
-                    </td>
+                      {/* Customer */}
+                      <td className="p-3">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-800">
+                            {getCustomerName(receipt.customer)}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            کد: {receipt.customer}
+                          </span>
+                        </div>
+                      </td>
 
-                    {/* Amount */}
-                    <td className="p-3">
-                      <span
-                        className={`
-                          inline-block px-3 py-1 rounded-full text-sm font-bold
-                          ${receipt.calculated
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-green-100 text-green-800"}
-                        `}
-                      >
-                        {Number(receipt.amount || 0).toLocaleString("en-US")}
-                      </span>
-                    </td>
-
-                    {/* Date */}
-                    <td className="p-3 text-gray-500 text-sm whitespace-nowrap">
-                      {formatDate(receipt.createdAt)}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="p-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handlePrintReceipt(receipt)}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                          title="چاپ رسید"
-                          disabled={editingId !== null}
+                      {/* Amount */}
+                      <td className="p-3">
+                        <span
+                          className={`
+                            inline-block px-3 py-1 rounded-full text-sm font-bold
+                            ${receipt.calculated
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-green-100 text-green-800"}
+                          `}
                         >
-                          <FaPrint />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {Number(receipt.amount || 0).toLocaleString("en-US")}
+                        </span>
+                      </td>
+
+                      {/* Remaining Money */}
+                      <td className="p-3">
+                        <span className="inline-block px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-bold">
+                          {remainingMoney.toLocaleString('en-US')}
+                        </span>
+                      </td>
+
+                      {/* Date */}
+                      <td className="p-3 text-gray-500 text-sm whitespace-nowrap">
+                        {formatDate(receipt.createdAt)}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="p-3">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handlePrintReceipt(receipt)}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+                            title="چاپ رسید"
+                            disabled={editingId !== null}
+                          >
+                            <FaPrint />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
