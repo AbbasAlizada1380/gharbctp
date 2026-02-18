@@ -143,7 +143,7 @@ const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
             {/* Main Content */}
             <div className="text-sm leading-8 mt-6 p-5 border-2 border-gray-200  rounded-lg shadow-sm">
               <p className="text-sm text-justify bg-white p-4 rounded border border-gray-100">
-                آقای/خانم
+                آقای/مطبعه
                <span className="font-bold text-md"> {customer.fullname || "................"} </span>
                
                 با شماره ثبت
@@ -162,7 +162,7 @@ const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
                 <strong className=" mx-1 px-2 py-1 rounded">
                   {formatToJalali(order.createdAt) || "................"}
                 </strong>
-                به دفتر <strong className="">غرب CTP</strong> بابت کرایه پلیت های کشیده شده شان پرداخت نمود.
+                به دفتر <strong className="">CTP غرب</strong> بابت کرایه پلیت های کشیده شده شان پرداخت نمود.
               </p>
             </div>
 
