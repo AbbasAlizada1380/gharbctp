@@ -3,7 +3,8 @@ import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import moment from "moment-jalaali";
-
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import VazirmatnTTF from "../../../../../public/ttf/Vazirmatn.js";
 
 moment.locale("en");
@@ -75,7 +76,7 @@ const DateOrderDownload = () => {
       );
 
       const headers = [
-        ["باقیمانده", "دریافتی", "مبلغ", "مشتری","نمبر بیل", "تعداد", "نام فایل", "سایز", "تاریخ", "شماره"]
+        ["باقیمانده", "دریافتی", "مبلغ", "مشتری", "نمبر بیل", "تعداد", "نام فایل", "سایز", "تاریخ", "شماره"]
       ];
 
       const body = items.map((item) => [
@@ -133,6 +134,102 @@ const DateOrderDownload = () => {
       setLoading(false);
     }
   };
+  const handleExcelDownload = async () => {
+    if (!fromDate || !toDate) {
+      alert("لطفاً بازه زمانی را انتخاب کنید");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const { data } = await axios.get(
+        `${BASE_URL}/orderItems/date_range`,
+        {
+          params: {
+            from: fromDate,
+            to: toDate,
+          },
+        }
+      );
+
+      if (!data?.data || data.data.length === 0) {
+        alert("هیچ اطلاعاتی یافت نشد");
+        return;
+      }
+
+      const items = data.data;
+
+      const totalCount = items.length;
+      const totalMoney = items.reduce(
+        (sum, item) => sum + Number(item.money || 0),
+        0
+      );
+      const totalReceipt = items.reduce(
+        (sum, item) => sum + Number(item.receipt || 0),
+        0
+      );
+      const totalRemaining = totalMoney - totalReceipt;
+
+      // Format data for Excel
+      const formattedData = items.map((item) => ({
+        شماره: item.id,
+        تاریخ: moment(item.createdAt).format("YYYY/MM/DD"),
+        سایز: item.size,
+        "نام فایل": item.fileName,
+        تعداد: item.qnty,
+        "نمبر بیل": item.invoiceNumber,
+        مشتری: item.customerName,
+        مبلغ: item.money,
+        دریافتی: item.receipt || 0,
+        باقیمانده: item.money - (item.receipt || 0),
+      }));
+
+      // Add summary row
+      formattedData.push({});
+      formattedData.push({
+        شماره: "مجموع سفارشات",
+        تاریخ: totalCount,
+      });
+      formattedData.push({
+        شماره: "مجموع مبلغ",
+        تاریخ: totalMoney,
+      });
+      formattedData.push({
+        شماره: "دریافتی",
+        تاریخ: totalReceipt,
+      });
+      formattedData.push({
+        شماره: "باقیمانده",
+        تاریخ: totalRemaining,
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(formattedData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
+
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+
+      const blob = new Blob([excelBuffer], {
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
+      });
+
+      saveAs(
+        blob,
+        `orders_${moment().format("YYYY-MM-DD")}.xlsx`
+      );
+
+    } catch (err) {
+      console.error(err);
+      alert("خطا در دریافت اطلاعات");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="p-6 flex items-center gap-4">
@@ -156,6 +253,13 @@ const DateOrderDownload = () => {
         className="bg-cyan-800 text-white px-4 py-2 rounded"
       >
         {loading ? "در حال ساخت PDF..." : "دانلود PDF"}
+      </button>
+      <button
+        onClick={handleExcelDownload}
+        disabled={loading}
+        className="bg-green-700 text-white px-4 py-2 rounded"
+      >
+        {loading ? "در حال ساخت Excel..." : "دانلود Excel"}
       </button>
     </div>
   );

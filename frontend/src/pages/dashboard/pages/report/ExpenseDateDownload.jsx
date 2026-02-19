@@ -57,12 +57,12 @@ const ExpenseDateDownload = () => {
             );
 
             // Table Headers
-            const headers = [["مبلغ", "توضیحات", "توسط", "تاریخ", "شماره"]];
+            const headers = [["مبلغ", "بابت", "توسط", "تاریخ", "شماره"]];
 
             // Table Body
             const body = data.expenses.map((expense) => [
                 Number(expense.amount).toLocaleString(),
-                expense.description || "—",
+                expense.purpose || "—",
                 expense.by || "نامشخص",
                 moment(expense.createdAt).format("YYYY/MM/DD"),
                 expense.id.toString(),

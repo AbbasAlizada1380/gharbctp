@@ -21,6 +21,7 @@
     "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
     "datepicker": "^0.0.0",
+    "file-saver": "^2.0.5",
     "framer-motion": "^12.4.10",
     "html2pdf.js": "^0.10.3",
     "jalaali-js": "^1.2.8",
@@ -49,7 +50,8 @@
     "sweetalert2": "^11.6.13",
     "sweetalert2-react-content": "^5.1.0",
     "tailwindcss": "^4.0.6",
-    "vazirmatn": "^33.0.3"
+    "vazirmatn": "^33.0.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
