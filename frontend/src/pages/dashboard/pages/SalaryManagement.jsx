@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaEdit, FaTrash, FaCheck, FaTimes, FaSpinner } from "react-icons/fa";
 import { useSelector } from "react-redux";
+import SalaryDateDownload from "./report/salaryDateDownload";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -389,9 +390,6 @@ const SalaryManagement = () => {
               </div>
               <div>
                 <h2 className="text-xl font-bold">لیست حضور و غیاب</h2>
-                <p className="text-sm text-white/80">
-                  {loading.records ? "در حال بارگذاری..." : `${records.length} رکورد`}
-                </p>
               </div>
             </div>
             {loading.records && (
@@ -400,6 +398,9 @@ const SalaryManagement = () => {
                 در حال بارگذاری...
               </div>
             )}
+          </div>
+          <div>
+            <SalaryDateDownload/>
           </div>
         </div>
 

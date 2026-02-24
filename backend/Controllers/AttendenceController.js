@@ -1,6 +1,6 @@
 import Attendance from "../Models/Attendence.js";
 import Staff from "../Models/staff/staff.js"
-
+import { Op } from "sequelize";
 const calculateAmounts = (attendance, dailySalary, overTimePerHour, workingDaysPerWeek) => {
   let attendanceDays = 0;
   let overtimeHours = 0;
@@ -123,5 +123,54 @@ export const deleteAttendance = async (req, res) => {
     res.json({ message: "Attendance deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+
+export const getAttendancesByDateRange = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({
+        message: "Both 'from' and 'to' dates are required",
+      });
+    }
+
+    // Convert query strings to Date objects
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    // Set end date to end of day
+    toDate.setHours(23, 59, 59, 999);
+
+    const attendances = await Attendance.findAll({
+      where: {
+        createdAt: {
+          [Op.between]: [fromDate, toDate],
+        },
+      },
+      include: [
+        {
+          model: Staff,
+          attributes: ["id", "name"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      message: "Attendances fetched successfully",
+      count: attendances.length,
+      data: attendances,
+    });
+
+  } catch (error) {
+    console.error("Error fetching attendances by date:", error);
+
+    res.status(500).json({
+      message: "Error fetching attendances",
+      error: error.message,
+    });
   }
 };
