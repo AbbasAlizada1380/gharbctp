@@ -144,8 +144,8 @@ const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
             <div className="text-sm leading-8 mt-6 p-5 border-2 border-gray-200  rounded-lg shadow-sm">
               <p className="text-sm text-justify bg-white p-4 rounded border border-gray-100">
                 آقای/مطبعه
-               <span className="font-bold text-md"> {customer.fullname || "................"} </span>
-               
+                <span className="font-bold text-md"> {order.Customer.fullname || "................"} </span>
+
                 با شماره ثبت
                 <span className=" mx-1 px-2 py-1 rounded">
                   {customer.id || "................"}

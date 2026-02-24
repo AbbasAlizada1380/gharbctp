@@ -150,9 +150,7 @@ const ReceiptManager = () => {
 
   /* ---------------- PRINT RECEIPT ---------------- */
   const handlePrintReceipt = (receipt) => {
-    const customerData = customersWithRemaining.find(
-      c => c.customer.id.toString() === receipt.customer.toString()
-    )?.customer;
+    const customerData = receipt?.Customer;
 
     const orderForPrint = {
       id: receipt.id,
@@ -613,7 +611,7 @@ const ReceiptManager = () => {
                       <td className="p-3">
                         <div className="flex flex-col">
                           <span className="font-semibold text-gray-800">
-                            {getCustomerName(receipt.customer)}
+                            {receipt.Customer.fullname}
                           </span>
                           <span className="text-xs text-gray-500">
                             کد: {receipt.customer}
