@@ -69,7 +69,10 @@ const ExpenseDateDownload = () => {
             ]);
 
             autoTable(doc, {
-                startY: 140,
+                margin: {
+                    top: 142,
+                    bottom: 60  // قبلاً پیشفرض بود، حالا حدود 1cm بیشتر
+                },
                 head: headers,
                 body: body,
                 theme: "grid",
@@ -107,7 +110,21 @@ const ExpenseDateDownload = () => {
             doc.text(`مجموع کل: ${totalAmount.toLocaleString()}`, pageWidth - 40, y + 20, { align: "right" });
             doc.text(`تاریخ صدور: ${today}`, pageWidth - 40, y + 40, { align: "right" });
 
-            // Save PDF
+            const pageCount = doc.internal.getNumberOfPages();
+            const pageHeight = doc.internal.pageSize.getHeight();
+
+            doc.setFontSize(10);
+
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+
+                doc.text(
+                    `${i}/${pageCount}`,
+                    pageWidth - 40,        // فاصله از راست
+                    pageHeight - 40,       // فاصله از پایین
+                    { align: "right" }
+                );
+            }
             doc.save(`Expenses_${formattedFrom}_to_${formattedTo}_${today}.pdf`);
         } catch (err) {
             console.error(err);

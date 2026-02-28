@@ -11,6 +11,31 @@ const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDele
 
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+
+        {/* invoice number */}
+        <div>
+          <label className="block mb-1 text-sm font-medium">نمبر بیل</label>
+          <input
+            type="text"
+            value={item.invoiceNumber}
+            onChange={(e) => handleItemChange(index, "invoiceNumber", e.target.value)}
+            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
+            placeholder="000"
+          />
+        </div>
+
+        {/* File Name */}
+        <div>
+          <label className="block mb-1 text-sm font-medium">نام فایل</label>
+          <input
+            type="text"
+            value={item.fileName}
+            onChange={(e) => handleItemChange(index, "fileName", e.target.value)}
+            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
+            placeholder="example.pdf"
+          />
+        </div>
+
         {/* Size */}
         <div>
           <label className="block mb-1 text-sm font-medium">سایز</label>
@@ -41,29 +66,6 @@ const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDele
           />
         </div>
 
-        {/* File Name */}
-        <div>
-          <label className="block mb-1 text-sm font-medium">نام فایل</label>
-          <input
-            type="text"
-            value={item.fileName}
-            onChange={(e) => handleItemChange(index, "fileName", e.target.value)}
-            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
-            placeholder="example.pdf"
-          />
-        </div>
-
-        {/* invoice number */}
-        <div>
-          <label className="block mb-1 text-sm font-medium">نمبر بیل</label>
-          <input
-            type="text"
-            value={item.invoiceNumber}
-            onChange={(e) => handleItemChange(index, "invoiceNumber", e.target.value)}
-            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
-            placeholder="000"
-          />
-        </div>
 
         {/* Price */}
         <div>

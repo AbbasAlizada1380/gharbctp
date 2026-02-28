@@ -152,7 +152,10 @@ const PrintOrderBill = ({ isOpen, onClose, order, autoPrint }) => {
                 </span>
                 مبلغ
                 <strong className="text-green-700 mx-1 px-2 py-1 rounded">
-                  {order.amount?.toLocaleString("fa-AF") || "................"} افغانی
+                  {order.amount
+                    ? Number(order.amount).toLocaleString("en-US")
+                    : "................"}{" "}
+                  افغانی
                 </strong>
                 (به حروف:
                 <strong className=" mx-1 px-2 py-1  rounded">

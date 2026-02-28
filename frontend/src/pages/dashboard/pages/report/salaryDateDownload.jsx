@@ -79,7 +79,10 @@ const SalaryDateDownload = () => {
             ]);
 
             autoTable(doc, {
-                startY: 140,
+                margin: {
+                    top: 140,
+                    bottom: 28.35 // ✅ دقیقاً 1cm فاصله از پایین
+                },
                 head: headers,
                 body: body,
                 theme: "grid",
@@ -155,7 +158,21 @@ const SalaryDateDownload = () => {
                 y + 80,
                 { align: "right" }
             );
+            const pageCount = doc.internal.getNumberOfPages();
+            const pageHeight = doc.internal.pageSize.getHeight();
 
+            doc.setFontSize(10);
+
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+
+                doc.text(
+                    `${i}/${pageCount}`,
+                    pageWidth - 40,        // فاصله از راست
+                    pageHeight - 40,       // فاصله از پایین
+                    { align: "right" }
+                );
+            }
             doc.save(
                 `Attendance_${formattedFrom}_to_${formattedTo}_${today}.pdf`
             );

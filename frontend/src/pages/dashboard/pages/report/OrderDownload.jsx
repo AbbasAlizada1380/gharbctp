@@ -72,7 +72,10 @@ const CustomerOrderDownload = ({ customerId }) => {
 
       autoTable(doc, {
         startY: 142,
-        margin: { top: 142 },
+        margin: {
+          top: 142,
+          bottom: 60  // قبلاً پیشفرض بود، حالا حدود 1cm بیشتر
+        },
 
         head: headers,
         body: body,

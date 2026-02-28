@@ -94,7 +94,10 @@ const DateOrderDownload = () => {
 
       autoTable(doc, {
         startY: 142,
-        margin: { top: 142 },
+        margin: {
+          top: 142,
+          bottom: 60  // قبلاً پیشفرض بود، حالا حدود 1cm بیشتر
+        },
         head: headers,
         body: body,
         theme: "grid",
@@ -122,7 +125,22 @@ const DateOrderDownload = () => {
       doc.text(`دریافتی: ${totalReceipt}`, 550, y + 36, { align: "right" });
       doc.text(`باقیمانده: ${totalRemaining}`, 550, y + 54, { align: "right" });
       doc.text(`صادر شده: ${today}`, 550, y + 72, { align: "right" });
+      const pageCount = doc.internal.getNumberOfPages();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
 
+      doc.setFontSize(10);
+
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+
+        doc.text(
+          `${i}/${pageCount}`,
+          pageWidth - 40,        // فاصله از راست
+          pageHeight - 40,       // فاصله از پایین
+          { align: "right" }
+        );
+      }
       doc.save(
         `orders_${moment().format("YYYY-MM-DD")}.pdf`
       );

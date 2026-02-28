@@ -80,7 +80,11 @@ const ReceiptDateDownload = () => {
             ]);
 
             autoTable(doc, {
-                startY: 140, // 3cm below title (85 + 40 = 125pt)
+                startY: 140,
+                margin: {
+                    top: 140,
+                    bottom: 28.35 // ✅ دقیقاً 1cm فاصله از پایین
+                },
                 head: headers,
                 body: body,
                 theme: "grid",
@@ -104,11 +108,6 @@ const ReceiptDateDownload = () => {
                     1: { halign: "center" },
                     2: { halign: "center" },
                     3: { halign: "center" },
-                },
-                didDrawCell: (data) => {
-                    if (data.cell) {
-                        data.cell.styles.font = "Vazirmatn";
-                    }
                 },
             });
 
