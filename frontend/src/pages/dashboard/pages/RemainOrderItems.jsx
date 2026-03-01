@@ -13,6 +13,7 @@ import {
 } from "react-icons/fa";
 import OrderDownload from "./report/OrderDownload";
 import Pagination from "../pagination/Pagination"
+import OrderDownloadrange from "./report/orderDownloadrange";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -125,7 +126,8 @@ const RemainOrderItems = ({ customer, onClose }) => {
           <div className="p-2 bg-white/20 rounded-full">
             <FaBoxOpen className="text-xl" />
           </div>
-          <OrderDownload customerId={customer.id} />
+          {/* <OrderDownload customerId={customer.id} /> */}
+          <OrderDownloadrange customerId={customer.id}/>
           <div>
             <h2 className="text-xl font-bold">گزارش سفارشات</h2>
             <p className="text-sm text-white/80">

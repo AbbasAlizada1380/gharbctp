@@ -178,7 +178,95 @@ const DateOrderDownload = () => {
 
       const items = data.data;
 
-      const totalCount = items.length;
+      // Group items by customerName
+      const customerGroups = items.reduce((groups, item) => {
+        const customerName = item.customerName || "نامشخص";
+        if (!groups[customerName]) {
+          groups[customerName] = [];
+        }
+        groups[customerName].push(item);
+        return groups;
+      }, {});
+
+      // Create a new workbook
+      const workbook = XLSX.utils.book_new();
+
+      // Process each customer group
+      Object.keys(customerGroups).forEach((customerName) => {
+        const customerItems = customerGroups[customerName];
+
+        // Calculate customer totals
+        const customerTotalMoney = customerItems.reduce(
+          (sum, item) => sum + Number(item.money || 0),
+          0
+        );
+        const customerTotalReceipt = customerItems.reduce(
+          (sum, item) => sum + Number(item.receipt || 0),
+          0
+        );
+        const customerTotalRemaining = customerTotalMoney - customerTotalReceipt;
+
+        // Format data for this customer
+        const formattedData = customerItems.map((item) => ({
+          شماره: item.id,
+          تاریخ: moment(item.createdAt).format("YYYY/MM/DD"),
+          سایز: item.size,
+          "نام فایل": item.fileName,
+          تعداد: item.qnty,
+          "نمبر بیل": item.invoiceNumber,
+          مبلغ: item.money,
+          دریافتی: item.receipt || 0,
+          باقیمانده: item.money - (item.receipt || 0),
+        }));
+
+        // Add empty row for spacing
+        formattedData.push({});
+
+        // Add summary rows for this customer
+        formattedData.push({
+          شماره: "مجموع سفارشات این مشتری",
+          تاریخ: customerItems.length,
+        });
+        formattedData.push({
+          شماره: "مجموع مبلغ این مشتری",
+          تاریخ: customerTotalMoney,
+        });
+        formattedData.push({
+          شماره: "دریافتی این مشتری",
+          تاریخ: customerTotalReceipt,
+        });
+        formattedData.push({
+          شماره: "باقیمانده این مشتری",
+          تاریخ: customerTotalRemaining,
+        });
+
+        // Convert to worksheet
+        const worksheet = XLSX.utils.json_to_sheet(formattedData);
+
+        // Set column widths (optional - for better formatting)
+        const colWidths = [
+          { wch: 15 }, // شماره
+          { wch: 12 }, // تاریخ
+          { wch: 10 }, // سایز
+          { wch: 25 }, // نام فایل
+          { wch: 8 },  // تعداد
+          { wch: 15 }, // نمبر بیل
+          { wch: 10 }, // مبلغ
+          { wch: 10 }, // دریافتی
+          { wch: 10 }, // باقیمانده
+        ];
+        worksheet['!cols'] = colWidths;
+
+        // Clean customer name for sheet name (remove invalid characters)
+        let sheetName = customerName.replace(/[\[\]:*?\/\\]/g, '_').substring(0, 31);
+
+        // Append sheet to workbook with customer name
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      });
+
+      // Create a summary sheet with overall totals AND the general table
+
+      // Calculate overall totals
       const totalMoney = items.reduce(
         (sum, item) => sum + Number(item.money || 0),
         0
@@ -189,56 +277,95 @@ const DateOrderDownload = () => {
       );
       const totalRemaining = totalMoney - totalReceipt;
 
-      // Format data for Excel
-      const formattedData = items.map((item) => ({
-        شماره: item.id,
-        تاریخ: moment(item.createdAt).format("YYYY/MM/DD"),
-        سایز: item.size,
-        "نام فایل": item.fileName,
-        تعداد: item.qnty,
-        "نمبر بیل": item.invoiceNumber,
-        مشتری: item.customerName,
-        مبلغ: item.money,
-        دریافتی: item.receipt || 0,
-        باقیمانده: item.money - (item.receipt || 0),
-      }));
+      // Create customer summary list with clear formatting
+      const customerList = Object.keys(customerGroups).map(name => ([
+        name,
+        customerGroups[name].length.toString(),
+        customerGroups[name].reduce((sum, item) => sum + Number(item.money || 0), 0).toLocaleString(),
+        customerGroups[name].reduce((sum, item) => sum + Number(item.receipt || 0), 0).toLocaleString()
+      ]));
 
-      // Add summary row
-      formattedData.push({});
-      formattedData.push({
-        شماره: "مجموع سفارشات",
-        تاریخ: totalCount,
-      });
-      formattedData.push({
-        شماره: "مجموع مبلغ",
-        تاریخ: totalMoney,
-      });
-      formattedData.push({
-        شماره: "دریافتی",
-        تاریخ: totalReceipt,
-      });
-      formattedData.push({
-        شماره: "باقیمانده",
-        تاریخ: totalRemaining,
+      // Create summary data with proper structure
+      const summaryData = [
+        ["گزارش کلی", ""],
+        ["بازه زمانی", `${moment(fromDate).format("YYYY/MM/DD")} تا ${moment(toDate).format("YYYY/MM/DD")}`],
+        ["تعداد کل سفارشات", items.length],
+        ["مجموع کل مبلغ", totalMoney.toLocaleString()],
+        ["مجموع کل دریافتی", totalReceipt.toLocaleString()],
+        ["مجموع کل باقیمانده", totalRemaining.toLocaleString()],
+        [],
+        ["لیست مشتریان", "تعداد سفارشات", "مجموع مبلغ", "مجموع دریافتی"],
+        ...customerList,
+        [],
+        ["جدول کامل سفارشات", "", "", "", "", "", "", "", ""],
+        ["شماره", "تاریخ", "سایز", "نام فایل", "تعداد", "نمبر بیل", "مشتری", "مبلغ", "دریافتی", "باقیمانده"]
+      ];
+
+      // Add all items to the summary data
+      items.forEach(item => {
+        summaryData.push([
+          item.id,
+          moment(item.createdAt).format("YYYY/MM/DD"),
+          item.size || "-",
+          item.fileName || "-",
+          item.qnty,
+          item.invoiceNumber || "-",
+          item.customerName || "نامشخص",
+          item.money?.toLocaleString() || "0",
+          (item.receipt || 0).toLocaleString(),
+          (item.money - (item.receipt || 0)).toLocaleString()
+        ]);
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(formattedData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
+      // Add total row at the end
+      summaryData.push([]);
+      summaryData.push([
+        "جمع کل",
+        "",
+        "",
+        "",
+        items.reduce((sum, item) => sum + (item.qnty || 0), 0),
+        "",
+        "",
+        totalMoney.toLocaleString(),
+        totalReceipt.toLocaleString(),
+        totalRemaining.toLocaleString()
+      ]);
 
+      // Create worksheet from array of arrays
+      const summaryWorksheet = XLSX.utils.aoa_to_sheet(summaryData);
+
+      // Set column widths for summary sheet
+      const summaryColWidths = [
+        { wch: 15 }, // شماره/عنوان
+        { wch: 12 }, // تاریخ
+        { wch: 10 }, // سایز
+        { wch: 25 }, // نام فایل
+        { wch: 8 },  // تعداد
+        { wch: 15 }, // نمبر بیل
+        { wch: 20 }, // مشتری
+        { wch: 15 }, // مبلغ
+        { wch: 15 }, // دریافتی
+        { wch: 15 }, // باقیمانده
+      ];
+      summaryWorksheet['!cols'] = summaryColWidths;
+
+      XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "خلاصه کل");
+
+      // Write workbook to buffer
       const excelBuffer = XLSX.write(workbook, {
         bookType: "xlsx",
         type: "array",
       });
 
+      // Create blob and download
       const blob = new Blob([excelBuffer], {
-        type:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
       });
 
       saveAs(
         blob,
-        `orders_${moment().format("YYYY-MM-DD")}.xlsx`
+        `orders_grouped_by_customer_${moment().format("YYYY-MM-DD")}.xlsx`
       );
 
     } catch (err) {
