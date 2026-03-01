@@ -152,7 +152,7 @@ const DateOrderDownload = () => {
       setLoading(false);
     }
   };
-  const handleExcelDownload = async () => {
+const handleExcelDownload = async () => {
     if (!fromDate || !toDate) {
       alert("لطفاً بازه زمانی را انتخاب کنید");
       return;
@@ -351,6 +351,88 @@ const DateOrderDownload = () => {
       summaryWorksheet['!cols'] = summaryColWidths;
 
       XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "خلاصه کل");
+
+      // ===== NEW SHEET: Size Statistics =====
+      
+      // Count sizes across all items
+      const sizeCounts = {};
+      items.forEach(item => {
+        const size = item.size || "نامشخص";
+        if (!sizeCounts[size]) {
+          sizeCounts[size] = {
+            count: 0,
+            totalQuantity: 0,
+            totalMoney: 0,
+            items: []
+          };
+        }
+        sizeCounts[size].count += 1;
+        sizeCounts[size].totalQuantity += item.qnty || 0;
+        sizeCounts[size].totalMoney += Number(item.money || 0);
+        sizeCounts[size].items.push(item);
+      });
+
+      // Create size statistics data
+      const sizeStatsData = [
+        ["آمار سایزهای دانلود شده", ""],
+        ["بازه زمانی", `${moment(fromDate).format("YYYY/MM/DD")} تا ${moment(toDate).format("YYYY/MM/DD")}`],
+        [],
+        ["ردیف", "سایز", "تعداد سفارشات", "تعداد کل آیتم‌ها", "مجموع مبلغ", "درصد از کل سفارشات", "مشتریان"],
+      ];
+
+      // Add size statistics rows
+      let rowIndex = 1;
+      const sortedSizes = Object.keys(sizeCounts).sort();
+      
+      sortedSizes.forEach(size => {
+        const stats = sizeCounts[size];
+        const percentage = ((stats.count / items.length) * 100).toFixed(1);
+        
+        // Get unique customers for this size
+        const uniqueCustomers = [...new Set(stats.items.map(item => item.customerName || "نامشخص"))];
+        const customersList = uniqueCustomers.join("، ");
+        
+        sizeStatsData.push([
+          rowIndex++,
+          size,
+          stats.count,
+          stats.totalQuantity,
+          stats.totalMoney.toLocaleString(),
+          `${percentage}%`,
+          customersList
+        ]);
+      });
+
+      // Add summary row
+      sizeStatsData.push([]);
+      sizeStatsData.push([
+        "جمع کل",
+        "",
+        items.length,
+        items.reduce((sum, item) => sum + (item.qnty || 0), 0),
+        totalMoney.toLocaleString(),
+        "100%",
+        Object.keys(customerGroups).length
+      ]);
+
+      // Create size statistics worksheet
+      const sizeStatsWorksheet = XLSX.utils.aoa_to_sheet(sizeStatsData);
+
+      // Set column widths for size statistics sheet
+      const sizeStatsColWidths = [
+        { wch: 8 },   // ردیف
+        { wch: 15 },  // سایز
+        { wch: 15 },  // تعداد سفارشات
+        { wch: 15 },  // تعداد کل آیتم‌ها
+        { wch: 15 },  // مجموع مبلغ
+        { wch: 15 },  // درصد
+        { wch: 50 },  // مشتریان
+      ];
+      sizeStatsWorksheet['!cols'] = sizeStatsColWidths;
+
+      XLSX.utils.book_append_sheet(workbook, sizeStatsWorksheet, "آمار سایزها");
+
+      // ===== END OF NEW SHEET =====
 
       // Write workbook to buffer
       const excelBuffer = XLSX.write(workbook, {
