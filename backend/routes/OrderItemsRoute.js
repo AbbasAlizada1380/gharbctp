@@ -9,13 +9,15 @@ import {
   getCustomerOrdersByType,
   simpleSearchOrderItems,
   getOrderItemsByDateRange,
+  getOrderItemsByCustomerAndDateRange, // 👈 ADD THIS IMPORT
 } from "../Controllers/OrderItemsController.js";
 
 const OrderItemRoute = express.Router();
 
 // ✅ Put specific routes FIRST
 OrderItemRoute.get("/search", simpleSearchOrderItems);
-OrderItemRoute.get("/date_range", getOrderItemsByDateRange); // 👈 ADD HERE
+OrderItemRoute.get("/date_range", getOrderItemsByDateRange);
+OrderItemRoute.get("/customer/:customerId/date_range", getOrderItemsByCustomerAndDateRange); // 👈 ADD THIS ROUTE
 
 // Then generic routes
 OrderItemRoute.get("/:customerId/:type", getCustomerOrdersByType);

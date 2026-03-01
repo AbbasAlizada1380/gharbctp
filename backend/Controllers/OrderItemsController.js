@@ -666,3 +666,145 @@ export const getOrderItemsByDateRange = async (req, res) => {
     });
   }
 };
+
+/* ===========================
+   Get Order Items by Customer ID and Date Range
+=========================== */
+export const getOrderItemsByCustomerAndDateRange = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { from, to } = req.query;
+
+    // Validate required parameters
+    if (!customerId) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer ID is required"
+      });
+    }
+
+    if (!from || !to) {
+      return res.status(400).json({
+        success: false,
+        message: "Both 'from' and 'to' dates are required"
+      });
+    }
+
+    // Validate customer exists
+    const customer = await Customer.findByPk(customerId);
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found"
+      });
+    }
+
+    // Parse and validate dates
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date format. Please provide valid dates"
+      });
+    }
+
+    // Set end date to end of day (23:59:59.999)
+    toDate.setHours(23, 59, 59, 999);
+
+    // Fetch order items for the customer within the date range
+    const orderItems = await OrderItem.findAll({
+      where: {
+        customerId: customerId,
+        createdAt: {
+          [Op.between]: [fromDate, toDate]
+        }
+      },
+      include: [
+        {
+          model: Customer,
+          as: "customer",
+          attributes: ["id", "fullname", "phoneNumber"]
+        }
+      ],
+      order: [["createdAt", "DESC"]] // Most recent first
+    });
+
+    // Format the response items with calculated fields
+    const formattedItems = orderItems.map(item => ({
+      id: item.id,
+      customerId: item.customerId,
+      customerName: item.customer?.fullname || null,
+      fileName: item.fileName,
+      size: item.size,
+      qnty: parseFloat(item.qnty || 0),
+      price: parseFloat(item.price || 0),
+      money: parseFloat(item.money || 0),
+      receipt: parseFloat(item.receipt || 0),
+      remaining: parseFloat(item.money || 0) - parseFloat(item.receipt || 0),
+      invoiceNumber: item.invoiceNumber,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt
+    }));
+
+    // Calculate summary statistics
+    const summary = {
+      totalItems: formattedItems.length,
+      totalQuantity: formattedItems.reduce((sum, item) => sum + item.qnty, 0),
+      totalMoney: formattedItems.reduce((sum, item) => sum + item.money, 0),
+      totalReceipt: formattedItems.reduce((sum, item) => sum + item.receipt, 0),
+      totalRemaining: formattedItems.reduce((sum, item) => sum + item.remaining, 0),
+      uniqueSizes: [...new Set(formattedItems.map(item => item.size))],
+      averageOrderValue: formattedItems.length > 0 
+        ? formattedItems.reduce((sum, item) => sum + item.money, 0) / formattedItems.length 
+        : 0
+    };
+
+    // Group by date for daily breakdown (optional)
+    const itemsByDate = formattedItems.reduce((acc, item) => {
+      const date = new Date(item.createdAt).toISOString().split('T')[0];
+      if (!acc[date]) {
+        acc[date] = {
+          date,
+          items: [],
+          totalMoney: 0,
+          totalQuantity: 0
+        };
+      }
+      acc[date].items.push(item.id);
+      acc[date].totalMoney += item.money;
+      acc[date].totalQuantity += item.qnty;
+      return acc;
+    }, {});
+
+    res.status(200).json({
+      success: true,
+      message: "Order items fetched successfully",
+      data: {
+        customer: {
+          id: customer.id,
+          fullname: customer.fullname,
+          phoneNumber: customer.phoneNumber
+        },
+        dateRange: {
+          from: fromDate.toISOString(),
+          to: toDate.toISOString()
+        },
+        summary,
+        dailyBreakdown: Object.values(itemsByDate),
+        items: formattedItems
+      }
+    });
+
+  } catch (error) {
+    console.error("Error in getOrderItemsByCustomerAndDateRange:", error);
+    
+    res.status(500).json({
+      success: false,
+      message: "Error fetching order items",
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
