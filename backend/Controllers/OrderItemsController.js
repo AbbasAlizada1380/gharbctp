@@ -487,7 +487,7 @@ export const getCustomerOrdersByType = async (req, res) => {
     /* =====================================================
        5. Format response
     ===================================================== */
-    const formattedItems = orderItems.map(item => ({
+    const formattedItems = orderItems.reverse().map(item => ({
       id: item.id,
       customerId: item.customerId,
       customerName: customerInfo?.fullname || null,
