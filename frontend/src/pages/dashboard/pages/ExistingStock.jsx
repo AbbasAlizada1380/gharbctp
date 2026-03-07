@@ -202,7 +202,7 @@ const ExistingStock = () => {
                       </td>
                       <td className="p-3">
                         <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-bold">
-                          {platesCount.toLocaleString('en-US')}
+                          {quantity.toLocaleString('en-US')}
                         </span>
                       </td>
                       <td className="p-3">

@@ -269,9 +269,19 @@ export const getReceiptsByDateRange = async (req, res) => {
 /* =====================================================
    GET ALL RECEIPTS (from Receipt table)
 ===================================================== */
+
 export const getAllReceipts = async (req, res) => {
   try {
-    const { customerId, startDate, endDate, minAmount, maxAmount, calculated } = req.query;
+    const {
+      customerId,
+      startDate,
+      endDate,
+      minAmount,
+      maxAmount,
+      calculated,
+      page = 1,
+      limit = 20
+    } = req.query;
 
     const where = {};
 
@@ -290,40 +300,56 @@ export const getAllReceipts = async (req, res) => {
     }
 
     if (calculated !== undefined) {
-      where.calculated = calculated === 'true';
+      where.calculated = calculated === "true";
     }
 
-    const receipts = await Receipt.findAll({
+    const pageNumber = parseInt(page);
+    const pageLimit = parseInt(limit);
+    const offset = (pageNumber - 1) * pageLimit;
+
+    const { rows: receipts, count } = await Receipt.findAndCountAll({
       where,
-      include: [{
-        model: Customer,
-        attributes: ["id", "fullname", "phoneNumber", "isActive"],
-      }],
+      include: [
+        {
+          model: Customer,
+          attributes: ["id", "fullname", "phoneNumber", "isActive"],
+        },
+      ],
       order: [["createdAt", "DESC"]],
+      limit: pageLimit,
+      offset: offset,
     });
 
-    const totalAmount = receipts.reduce((sum, receipt) =>
-      sum + parseFloat(receipt.amount || 0), 0
+    const totalAmount = receipts.reduce(
+      (sum, receipt) => sum + parseFloat(receipt.amount || 0),
+      0
     );
 
-    const calculatedTotal = receipts.filter(r => r.calculated).reduce((sum, r) =>
-      sum + parseFloat(r.amount || 0), 0
-    );
-    const manualTotal = receipts.filter(r => !r.calculated).reduce((sum, r) =>
-      sum + parseFloat(r.amount || 0), 0
-    );
+    const calculatedTotal = receipts
+      .filter((r) => r.calculated)
+      .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+
+    const manualTotal = receipts
+      .filter((r) => !r.calculated)
+      .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
 
     res.json({
       success: true,
-      count: receipts.length,
+      page: pageNumber,
+      limit: pageLimit,
+      totalRecords: count,
+      totalPages: Math.ceil(count / pageLimit),
+
       totalAmount,
       calculatedTotal,
       manualTotal,
+
       summary: {
-        totalReceipts: receipts.length,
-        calculatedReceipts: receipts.filter(r => r.calculated).length,
-        manualReceipts: receipts.filter(r => !r.calculated).length,
+        totalReceipts: count,
+        calculatedReceipts: receipts.filter((r) => r.calculated).length,
+        manualReceipts: receipts.filter((r) => !r.calculated).length,
       },
+
       data: receipts,
     });
   } catch (error) {

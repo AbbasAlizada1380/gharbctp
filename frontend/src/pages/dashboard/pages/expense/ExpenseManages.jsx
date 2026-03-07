@@ -4,7 +4,7 @@ import ExpenseTable from "./ExpenseTable";
 import { useSelector } from "react-redux";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-const limit = 10;
+const limit = 20;
 
 const ExpenseManager = () => {
     const [expenses, setExpenses] = useState([]);
