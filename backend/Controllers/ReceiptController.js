@@ -9,7 +9,7 @@ import Remain from "../Models/Remain.js";
    CREATE RECEIPT (Distribute payment to unpaid orders)
 ===================================================== */
 export const createReceipt = async (req, res) => {
-  const { customer, amount, calculated } = req.body;
+  const { customer, amount, calculated, description } = req.body; // Added description
 
   if (!customer || !amount) {
     return res.status(400).json({
@@ -151,13 +151,14 @@ export const createReceipt = async (req, res) => {
     );
 
     /* =====================================================
-       6. Create Receipt record with calculated field
+       6. Create Receipt record with calculated and description fields
     ===================================================== */
     const receiptData = {
       customer,
       amount: payAmount,
       paymentDetails: JSON.stringify(paymentDetails),
       remainingAmount: remainingAmount > 0 ? remainingAmount : 0,
+      description: description || null, // Add description field
     };
 
     // Add calculated field if provided
@@ -191,13 +192,15 @@ export const createReceipt = async (req, res) => {
   }
 };
 
-
-
+/* =====================================================
+   GET RECEIPTS BY DATE RANGE
+===================================================== */
 export const getReceiptsByDateRange = async (req, res) => {
-  const { from, to } = req.query;
+  const { from, to, customerId } = req.query;
 
   if (!from || !to) {
     return res.status(400).json({
+      success: false,
       message: "from and to dates are required",
     });
   }
@@ -207,29 +210,31 @@ export const getReceiptsByDateRange = async (req, res) => {
     const startDate = new Date(`${from}T00:00:00`);
     const endDate = new Date(`${to}T23:59:59`);
 
-    const receipts = await Receipt.findAll({
-      where: {
-        createdAt: {
-          [Op.between]: [startDate, endDate],
-        },
+    // Build where clause
+    const whereClause = {
+      createdAt: {
+        [Op.between]: [startDate, endDate],
       },
+    };
+
+    // Add customer filter if provided
+    if (customerId) {
+      whereClause.customer = customerId;
+    }
+
+    const receipts = await Receipt.findAll({
+      where: whereClause,
       include: [
         {
           model: Customer,
           as: "Customer", // ⚠️ MUST match your association alias
-          attributes: ["id", "fullname"],
+          attributes: ["id", "fullname", "phoneNumber"],
         },
       ],
       order: [["createdAt", "DESC"]],
     });
 
-    if (!receipts.length) {
-      return res.status(404).json({
-        message: "No receipts found in this date range",
-      });
-    }
-
-    // ===== Calculations =====
+    // Calculate totals
     const totalAmount = receipts.reduce(
       (sum, r) => sum + parseFloat(r.amount || 0),
       0
@@ -249,17 +254,26 @@ export const getReceiptsByDateRange = async (req, res) => {
     );
 
     return res.status(200).json({
+      success: true,
       message: "Receipts fetched successfully",
-      totalCount: receipts.length,
-      totalAmount,
-      totalDistributed,
-      totalRemaining,
-      receipts,
+      data: {
+        receipts,
+        totalCount: receipts.length,
+        totalAmount,
+        totalDistributed,
+        totalRemaining,
+        filters: {
+          from,
+          to,
+          customerId: customerId || null,
+        },
+      },
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error in getReceiptsByDateRange:", error);
     return res.status(500).json({
+      success: false,
       message: "Error fetching receipts",
       error: error.message,
     });
@@ -269,7 +283,6 @@ export const getReceiptsByDateRange = async (req, res) => {
 /* =====================================================
    GET ALL RECEIPTS (from Receipt table)
 ===================================================== */
-
 export const getAllReceipts = async (req, res) => {
   try {
     const {
@@ -279,6 +292,7 @@ export const getAllReceipts = async (req, res) => {
       minAmount,
       maxAmount,
       calculated,
+      searchDescription, // Added search by description
       page = 1,
       limit = 20
     } = req.query;
@@ -301,6 +315,13 @@ export const getAllReceipts = async (req, res) => {
 
     if (calculated !== undefined) {
       where.calculated = calculated === "true";
+    }
+
+    // Add description search
+    if (searchDescription) {
+      where.description = {
+        [Op.like]: `%${searchDescription}%`
+      };
     }
 
     const pageNumber = parseInt(page);
@@ -400,11 +421,11 @@ export const getReceiptById = async (req, res) => {
 ===================================================== */
 export const updateReceipt = async (req, res) => {
   const { id } = req.params;
-  const { amount, calculated } = req.body;
+  const { amount, calculated, description } = req.body; // Added description
 
-  if (!amount && calculated === undefined) {
+  if (!amount && calculated === undefined && description === undefined) {
     return res.status(400).json({
-      message: "At least amount or calculated field must be provided",
+      message: "At least amount, calculated, or description field must be provided",
     });
   }
 
@@ -422,6 +443,11 @@ export const updateReceipt = async (req, res) => {
     }
 
     const updateData = {};
+
+    // Update description field if provided
+    if (description !== undefined) {
+      updateData.description = description;
+    }
 
     // Update calculated field if provided
     if (calculated !== undefined) {
@@ -570,6 +596,44 @@ export const bulkUpdateCalculated = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error bulk updating receipts",
+      error: error.message,
+    });
+  }
+};
+
+/* =====================================================
+   BULK UPDATE DESCRIPTION
+===================================================== */
+export const bulkUpdateDescription = async (req, res) => {
+  try {
+    const { ids, description } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0 || description === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "ids array and description are required",
+      });
+    }
+
+    const [affectedCount] = await Receipt.update(
+      { description },
+      {
+        where: {
+          id: ids
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully updated description for ${affectedCount} receipt(s)`,
+      affectedCount,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Error bulk updating descriptions",
       error: error.message,
     });
   }
@@ -793,6 +857,7 @@ export const deleteReceipt = async (req, res) => {
         receiptId: receipt.id,
         amount: receipt.amount,
         calculated: receipt.calculated,
+        description: receipt.description, // Include description in response
         customerId: customerId,
         ordersAffected: paymentDetails.length,
       }
@@ -1046,6 +1111,7 @@ export const getCustomerPaymentSummary = async (req, res) => {
         id: r.id,
         amount: r.amount,
         calculated: r.calculated,
+        description: r.description, // Include description
         createdAt: r.createdAt,
         paymentDetails: r.paymentDetails ? JSON.parse(r.paymentDetails) : [],
       })),
@@ -1137,6 +1203,65 @@ export const getReceiptSummary = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching receipt summary",
+      error: error.message,
+    });
+  }
+};
+
+/* =====================================================
+   SEARCH RECEIPTS BY DESCRIPTION
+===================================================== */
+export const searchReceiptsByDescription = async (req, res) => {
+  try {
+    const { query, page = 1, limit = 20 } = req.query;
+
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required",
+      });
+    }
+
+    const pageNumber = parseInt(page);
+    const pageLimit = parseInt(limit);
+    const offset = (pageNumber - 1) * pageLimit;
+
+    const { rows: receipts, count } = await Receipt.findAndCountAll({
+      where: {
+        description: {
+          [Op.like]: `%${query}%`
+        }
+      },
+      include: [
+        {
+          model: Customer,
+          attributes: ["id", "fullname", "phoneNumber"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: pageLimit,
+      offset: offset,
+    });
+
+    const totalAmount = receipts.reduce(
+      (sum, receipt) => sum + parseFloat(receipt.amount || 0),
+      0
+    );
+
+    res.json({
+      success: true,
+      page: pageNumber,
+      limit: pageLimit,
+      totalRecords: count,
+      totalPages: Math.ceil(count / pageLimit),
+      totalAmount,
+      data: receipts,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Error searching receipts",
       error: error.message,
     });
   }

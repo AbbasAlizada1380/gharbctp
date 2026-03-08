@@ -31,6 +31,7 @@ const initialForm = {
   customer: "",
   amount: "",
   calculated: false,
+  description: ""
 };
 
 const ReceiptManager = () => {
@@ -206,6 +207,7 @@ const ReceiptManager = () => {
         customer: form.customer,
         amount: parseFloat(form.amount),
         calculated: form.calculated,
+        description: form.description
       };
 
       if (editingId) {
@@ -452,7 +454,7 @@ const ReceiptManager = () => {
                   <option value="">انتخاب مشتری</option>
                   {displayCustomers.map((item) => (
                     <option key={item.customer.id} value={item.customer.id}>
-                      {item.customer.fullname} 
+                      {item.customer.fullname}
                     </option>
                   ))}
                 </select>
@@ -494,6 +496,21 @@ const ReceiptManager = () => {
                   حداکثر مبلغ قابل پرداخت: {selectedCustomerDetails.remainingMoney.toLocaleString('en-US')} افغانی
                 </p>
               )}
+            </div>
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                توضیحات
+              </label>
+
+              <textarea
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                placeholder="توضیحات مربوط به رسید..."
+                rows="3"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
             </div>
 
             {/* Error Display */}
@@ -561,7 +578,7 @@ const ReceiptManager = () => {
       {/* Receipts Table */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
         {/* Table Header */}
-        <div className="bg-gradient-to-r from-cyan-800 to-cyan-600 text-white p-4">
+        <div className="p-4">
           <ReceiptDateDownload />
         </div>
 
@@ -573,6 +590,7 @@ const ReceiptManager = () => {
                 <th className="p-3 border-b font-semibold">#</th>
                 <th className="p-3 border-b font-semibold">مشتری</th>
                 <th className="p-3 border-b font-semibold">مبلغ (افغانی)</th>
+                <th className="p-3 border-b font-semibold">توضیحات</th>
                 <th className="p-3 border-b font-semibold">باقیمانده</th>
                 <th className="p-3 border-b font-semibold">تاریخ ثبت</th>
                 <th className="p-3 border-b font-semibold">عملیات</th>
@@ -632,7 +650,9 @@ const ReceiptManager = () => {
                           {Number(receipt.amount || 0).toLocaleString("en-US")}
                         </span>
                       </td>
-
+                      <td className="p-3 text-gray-600 text-sm max-w-xs truncate">
+                        {receipt.description || "-"}
+                      </td>
                       {/* Remaining Money */}
                       <td className="p-3">
                         <span className="inline-block px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-bold">
