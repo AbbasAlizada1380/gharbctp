@@ -25,7 +25,6 @@ export const signIn = createAsyncThunk(
       );
 
       const { token, user } = response.data;
-
       // Encrypt token before saving in Redux
       const encryptedToken = CryptoJS.AES.encrypt(
         token,

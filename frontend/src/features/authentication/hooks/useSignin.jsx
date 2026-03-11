@@ -23,11 +23,16 @@ const useSignin = () => {
       const resultAction = await dispatch(signIn({ email, password }));
 
       // Check if login succeeded
-      if (signIn.fulfilled.match(resultAction)) {
-        console.log("✅ Login successful:", resultAction.payload);
-        // optional navigation after login
-       navigate("/dashboard", { replace: true });
+      if (signIn.fulfilled.match(resultAction)) if (signIn.fulfilled.match(resultAction)) {
+        const role = resultAction.payload.userData.role;
 
+        console.log("✅ Login successful:", role);
+
+        if (role === "FinancialManager") {
+          navigate("/financialdashboard", { replace: true });
+        } else {
+          navigate("/dashboard", { replace: true });
+        }
       } else {
         console.error("❌ Login failed:", resultAction.payload);
       }

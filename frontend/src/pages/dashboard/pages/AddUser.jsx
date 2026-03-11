@@ -11,7 +11,7 @@ const AddUser = () => {
     confirmPassword: "",
     role: "",
   });
-  const [roles] = useState([{ id: 1, name: "reception" }]);
+  const [roles] = useState([{ id: 1, name: "reception" }, { id: 2, name: "FinancialManager" }]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -343,7 +343,7 @@ const AddUser = () => {
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg">
-                  <LuUsers size={24} className="text-cyan-800"/>
+                  <LuUsers size={24} className="text-cyan-800" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-800">
                   لیست کاربران
