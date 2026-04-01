@@ -1,7 +1,7 @@
-// Sidebar.js (Corrected Role Handling)
+// Sidebar.js (Corrected Role Handling with Financial Dashboard navigation)
 
 import React, { useState } from "react";
-import { FaBuilding, FaSignOutAlt } from "react-icons/fa";
+import { FaBuilding, FaSignOutAlt, FaChartLine } from "react-icons/fa"; // Import FaChartLine
 import { useSelector, useDispatch } from "react-redux";
 import { signOutSuccess } from "../../state/userSlice/userSlice";
 import { useNavigate } from "react-router-dom";
@@ -45,6 +45,7 @@ const Sidebar = ({ setActiveComponent }) => {
       }
     });
   };
+
   const AllComponents = [
     {
       name: "صفحه اصلی",
@@ -97,6 +98,11 @@ const Sidebar = ({ setActiveComponent }) => {
       icon: <MdPayments />,
     },
     {
+      name: "داشبورد مالی",          // New item
+      value: "financialDashboard",    // Value used for navigation
+      icon: <FaChartLine />,
+    },
+    {
       name: "ثبت کاربر جدید",
       value: "AddUser",
       icon: <LucideUserRoundPlus />,
@@ -123,20 +129,22 @@ const Sidebar = ({ setActiveComponent }) => {
         "Receipt",
         "Stock",
         "CompanyStock",
-        "ExpenseManager", "Money", "StaffManager", "SalaryManagement",
+        "ExpenseManager",
+        "Money",
+        "StaffManager",
+        "SalaryManagement",
+        "financialDashboard", // Add to allowed list for reception
         "signout",
       ];
       accessibleComponents = AllComponents.filter((component) =>
         receptionAllowedValues.includes(component.value)
       );
     } else {
-      // Default fallback for other roles or no role
       accessibleComponents = AllComponents.filter(
         (component) => component.value === "signout"
       );
     }
   } else {
-    // If no user is logged in, show only basic components
     accessibleComponents = AllComponents.filter(
       (component) =>
         component.value === "Orders" || component.value === "signout"
@@ -151,26 +159,47 @@ const Sidebar = ({ setActiveComponent }) => {
         <div className="flex items-center justify-center p-1 bg-white rounded-full">
           <img src="/logo.png" alt="Logo" className="h-8 w-8 rounded-full" />
         </div>
-
-        <span className="text-lg font-semibold  text-white whitespace-nowrap">
+        <span className="text-lg font-semibold text-white whitespace-nowrap">
           غرب سی تی پی
         </span>
       </header>
 
-      <ul className=" mr-1 px-3">
+      <ul className="mr-1 px-3">
         {accessibleComponents.map((component, index) => (
           <li key={index} className="relative group cursor-pointer">
             {component.value === "signout" ? (
               <a
                 onClick={handleSignOut}
-                className={`relative flex items-center w-full px-6 py-3 transition-all duration-300  rounded-md
-                ${activeC === component.value
+                className={`relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md
+                ${
+                  activeC === component.value
                     ? "bg-white text-gray-800"
                     : "hover:bg-white hover:bg-opacity-20 text-white hover:text-black"
-                  }`}
+                }`}
               >
                 <span className="text-xl">{component.icon}</span>
-
+                <span className="mr-4 text-lg font-semibold whitespace-nowrap">
+                  {component.name}
+                </span>
+              </a>
+            ) : component.value === "financialDashboard" ? (
+              // New navigation item for financial dashboard
+              <a
+                onClick={() => {
+                  navigate("/financialdashboard");
+                  setSelectedC(component.value);
+                  setActiveC(component.value);
+                }}
+                onMouseEnter={() => setActiveC(component.value)}
+                onMouseLeave={() => setActiveC(selectedC)}
+                className={`relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md
+                ${
+                  activeC === component.value
+                    ? "bg-white text-gray-800"
+                    : "hover:bg-white hover:bg-opacity-20 text-white"
+                }`}
+              >
+                <span className="text-xl">{component.icon}</span>
                 <span className="mr-4 text-lg font-semibold whitespace-nowrap">
                   {component.name}
                 </span>
@@ -185,13 +214,13 @@ const Sidebar = ({ setActiveComponent }) => {
                 onMouseEnter={() => setActiveC(component.value)}
                 onMouseLeave={() => setActiveC(selectedC)}
                 className={`relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md
-                ${activeC === component.value
+                ${
+                  activeC === component.value
                     ? "bg-white text-gray-800"
                     : "hover:bg-white hover:bg-opacity-20 text-white"
-                  }`}
+                }`}
               >
                 <span className="text-xl">{component.icon}</span>
-
                 <span className="mr-4 text-lg font-semibold whitespace-nowrap">
                   {component.name}
                 </span>

@@ -28,6 +28,12 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const employeeRoutes = (await import("./routes/debt/routes/employeeRoutes.js")).default;
+const loanRoutes = (await import("./routes/debt/routes/loanRoutes.js")).default;
+const paymentRoutes = (await import("./routes/debt/routes/paymentRoutes.js")).default;
+const reportRoutes = (await import("./routes/debt/routes/reportRoutes.js")).default;
+const walletRoutes = (await import("./routes/debt/routes/walletRoutes.js")).default;
+
 // ✅ Configure CORS properly
 const allowedOrigins = [
   `${FRONT_URL}`, // React local dev
@@ -82,6 +88,13 @@ app.use("/money", MoneyRoute);
 app.use("/report", ReportRoute);
 app.use("/companystock", CompanyStockRoute);
 app.use("/palletmoney", PalletRoute);
+
+
+app.use("/employees", employeeRoutes);
+app.use("/loans", loanRoutes);
+app.use("/payments", paymentRoutes);
+app.use("/reports", reportRoutes);
+app.use("/wallets", walletRoutes);
 
 // Sync database and start server
 sequelize

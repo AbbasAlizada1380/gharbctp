@@ -11,7 +11,7 @@ export const getEmployees = async ({
   search = "",
 } = {}) => {
   try {
-    const response = await axios.get(`${API_URL}/api/employees`, {
+    const response = await axios.get(`${API_URL}/employees`, {
       params: {
         page,
         limit,
@@ -32,7 +32,7 @@ export const getEmployees = async ({
 // دریافت همه کارمندان بدون صفحه‌بندی (برای dropdownها)
 export const getAllEmployees = async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/employees/all`);
+    const response = await axios.get(`${API_URL}/employees/all`);
     return response.data; // { success: true, data: employees }
   } catch (error) {
     console.error("❌ Error fetching all employees:", {
@@ -90,7 +90,7 @@ export const getAllEmployeesSafe = async () => {
 // دریافت اطلاعات یک کارمند
 export const getEmployeeById = async (employeeId) => {
   try {
-    const response = await axios.get(`${API_URL}/api/employees/${employeeId}`);
+    const response = await axios.get(`${API_URL}/employees/${employeeId}`);
     return response.data; // { success: true, data: employee }
   } catch (error) {
     console.error("❌ Error fetching employee:", {
@@ -105,7 +105,7 @@ export const getEmployeeById = async (employeeId) => {
 // ثبت کارمند جدید
 export const createEmployee = async (employeeData) => {
   try {
-    const response = await axios.post(`${API_URL}/api/employees`, employeeData);
+    const response = await axios.post(`${API_URL}/employees`, employeeData);
     return response.data; // { success: true, data: employee }
   } catch (error) {
     console.error("❌ Error creating employee:", {
@@ -121,7 +121,7 @@ export const createEmployee = async (employeeData) => {
 export const updateEmployee = async (employeeId, employeeData) => {
   try {
     const response = await axios.put(
-      `${API_URL}/api/employees/${employeeId}`,
+      `${API_URL}/employees/${employeeId}`,
       employeeData,
     );
     return response.data; // { success: true, data: employee }
@@ -139,7 +139,7 @@ export const updateEmployee = async (employeeId, employeeData) => {
 export const deleteEmployee = async (employeeId) => {
   try {
     const response = await axios.delete(
-      `${API_URL}/api/employees/${employeeId}`,
+      `${API_URL}/employees/${employeeId}`,
     );
     return response.data; // { success: true, message: "..." }
   } catch (error) {
@@ -158,7 +158,7 @@ export const deleteEmployee = async (employeeId) => {
 export const getEmployeeWallet = async (employeeId) => {
   try {
     const response = await axios.get(
-      `${API_URL}/api/wallets/employee/${employeeId}`,
+      `${API_URL}/wallets/employee/${employeeId}`,
     );
     return response.data; // { success: true, data: wallet }
   } catch (error) {
@@ -174,7 +174,7 @@ export const getEmployeeWallet = async (employeeId) => {
 // دریافت همه والت‌ها
 export const getAllWallets = async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/wallets`);
+    const response = await axios.get(`${API_URL}/wallets`);
     return response.data; // { success: true, data: wallets, summary }
   } catch (error) {
     console.error("❌ Error fetching wallets:", {
@@ -190,7 +190,7 @@ export const getAllWallets = async () => {
 export const resetWallet = async (walletId) => {
   try {
     const response = await axios.put(
-      `${API_URL}/api/wallets/${walletId}/reset`,
+      `${API_URL}/wallets/${walletId}/reset`,
     );
     return response.data; // { success: true, message: "...", data: wallet }
   } catch (error) {
@@ -208,7 +208,7 @@ export const resetWallet = async (walletId) => {
 // دریافت لیست قرضه‌های فعال
 export const getActiveLoans = async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/loans/active`);
+    const response = await axios.get(`${API_URL}/loans/active`);
     return response.data; // { success: true, data: { loans, summary } }
   } catch (error) {
     console.error("❌ Error fetching active loans:", {
@@ -223,7 +223,7 @@ export const getActiveLoans = async () => {
 // دریافت لیست قرضه‌های بسته شده
 export const getClosedLoans = async ({ page = 1, limit = 10 } = {}) => {
   try {
-    const response = await axios.get(`${API_URL}/api/loans/closed`, {
+    const response = await axios.get(`${API_URL}/loans/closed`, {
       params: { page, limit },
     });
     return response.data; // { success: true, data: loans, pagination }
@@ -240,7 +240,7 @@ export const getClosedLoans = async ({ page = 1, limit = 10 } = {}) => {
 // دریافت اطلاعات یک قرضه
 export const getLoanById = async (loanId) => {
   try {
-    const response = await axios.get(`${API_URL}/api/loans/${loanId}`);
+    const response = await axios.get(`${API_URL}/loans/${loanId}`);
     return response.data; // { success: true, data: loan }
   } catch (error) {
     console.error("❌ Error fetching loan:", {
@@ -255,7 +255,7 @@ export const getLoanById = async (loanId) => {
 // ثبت قرضه جدید
 export const createLoan = async (loanData) => {
   try {
-    const response = await axios.post(`${API_URL}/api/loans`, loanData);
+    const response = await axios.post(`${API_URL}/loans`, loanData);
     return response.data; // { success: true, data: loan }
   } catch (error) {
     console.error("❌ Error creating loan:", {
@@ -270,7 +270,7 @@ export const createLoan = async (loanData) => {
 // بستن قرضه به صورت دستی
 export const closeLoan = async (loanId) => {
   try {
-    const response = await axios.put(`${API_URL}/api/loans/${loanId}/close`);
+    const response = await axios.put(`${API_URL}/loans/${loanId}/close`);
     return response.data; // { success: true, message: "...", data: loan }
   } catch (error) {
     console.error("❌ Error closing loan:", {
@@ -287,7 +287,7 @@ export const closeLoan = async (loanId) => {
 // ثبت پرداخت جدید
 export const makePayment = async (paymentData) => {
   try {
-    const response = await axios.post(`${API_URL}/api/payments`, paymentData);
+    const response = await axios.post(`${API_URL}/payments`, paymentData);
     return response.data; // { success: true, message: "...", data: { payment, loan, wallet } }
   } catch (error) {
     console.error("❌ Error making payment:", {
@@ -302,7 +302,7 @@ export const makePayment = async (paymentData) => {
 // دریافت پرداخت‌های یک قرضه
 export const getLoanPayments = async (loanId) => {
   try {
-    const response = await axios.get(`${API_URL}/api/payments/loan/${loanId}`);
+    const response = await axios.get(`${API_URL}/payments/loan/${loanId}`);
     return response.data; // { success: true, data: { payments, summary } }
   } catch (error) {
     console.error("❌ Error fetching loan payments:", {
@@ -317,7 +317,7 @@ export const getLoanPayments = async (loanId) => {
 // دریافت اطلاعات یک پرداخت
 export const getPaymentById = async (paymentId) => {
   try {
-    const response = await axios.get(`${API_URL}/api/payments/${paymentId}`);
+    const response = await axios.get(`${API_URL}/payments/${paymentId}`);
     return response.data; // { success: true, data: payment }
   } catch (error) {
     console.error("❌ Error fetching payment:", {
@@ -333,7 +333,7 @@ export const getPaymentById = async (paymentId) => {
 export const updatePayment = async (paymentId, paymentData) => {
   try {
     const response = await axios.put(
-      `${API_URL}/api/payments/${paymentId}`,
+      `${API_URL}/payments/${paymentId}`,
       paymentData,
     );
     return response.data; // { success: true, message: "...", data: { payment, loan } }
@@ -350,7 +350,7 @@ export const updatePayment = async (paymentId, paymentData) => {
 // حذف پرداخت
 export const deletePayment = async (paymentId) => {
   try {
-    const response = await axios.delete(`${API_URL}/api/payments/${paymentId}`);
+    const response = await axios.delete(`${API_URL}/payments/${paymentId}`);
     return response.data; // { success: true, message: "..." }
   } catch (error) {
     console.error("❌ Error deleting payment:", {
@@ -367,7 +367,7 @@ export const deletePayment = async (paymentId) => {
 // دریافت خلاصه گزارش کمپنی
 export const getCompanySummary = async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/reports/summary`);
+    const response = await axios.get(`${API_URL}/reports/summary`);
     return response.data; // { success: true, data: summary }
   } catch (error) {
     console.error("❌ Error fetching company summary:", {
@@ -382,7 +382,7 @@ export const getCompanySummary = async () => {
 // دریافت آمار داشبورد
 export const getDashboardStats = async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/reports/dashboard`);
+    const response = await axios.get(`${API_URL}/reports/dashboard`);
     return response.data; // { success: true, data: stats }
   } catch (error) {
     console.error("❌ Error fetching dashboard stats:", {
@@ -398,7 +398,7 @@ export const getDashboardStats = async () => {
 export const getEmployeeLoanHistory = async (employeeId) => {
   try {
     const response = await axios.get(
-      `${API_URL}/api/reports/employee/${employeeId}/loans`,
+      `${API_URL}/reports/employee/${employeeId}/loans`,
     );
     return response.data; // { success: true, data: { employee, statistics, loans } }
   } catch (error) {
@@ -418,7 +418,7 @@ export const getPaymentsReport = async ({
   employeeId,
 } = {}) => {
   try {
-    const response = await axios.get(`${API_URL}/api/reports/payments`, {
+    const response = await axios.get(`${API_URL}/reports/payments`, {
       params: {
         startDate,
         endDate,
@@ -444,7 +444,7 @@ export const getLoansReport = async ({
   employeeId,
 } = {}) => {
   try {
-    const response = await axios.get(`${API_URL}/api/reports/loans`, {
+    const response = await axios.get(`${API_URL}/reports/loans`, {
       params: {
         status,
         startDate,

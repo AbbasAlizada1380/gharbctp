@@ -74,7 +74,7 @@ const CompanyReport = () => {
             <div>
               <p className="text-sm text-gray-600">مجموع قرضه‌ها</p>
               <p className="text-base font-bold text-teal-700">
-                {formatMoney(summary.totalLoanAmount || 0)} 
+                {formatMoney(summary.totalLoanAmount || 0)}
               </p>
             </div>
             <div className="bg-white p-3 rounded-md">
@@ -89,7 +89,7 @@ const CompanyReport = () => {
             <div>
               <p className="text-sm text-gray-600">باقی‌مانده کل</p>
               <p className="text-base font-bold text-red-600">
-                {formatMoney(summary.totalRemainingBalance || 0)} 
+                {formatMoney(summary.totalRemainingBalance || 0)}
               </p>
             </div>
             <div className="bg-white p-3 rounded-md">

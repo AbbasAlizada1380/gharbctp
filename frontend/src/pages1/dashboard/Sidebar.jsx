@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { signOutSuccess } from "../../state/userSlice/userSlice";
 import { useNavigate } from "react-router-dom";
@@ -6,18 +6,13 @@ import Swal from "sweetalert2";
 import withReactContent from "sweetalert2-react-content";
 import {
   FaHome,
-  FaUsers,
-  FaWallet,
-  FaMoneyBillWave,
   FaChartPie,
   FaSignOutAlt,
-  FaFileInvoiceDollar,
 } from "react-icons/fa";
 import {
-  MdOutlineDashboardCustomize,
   MdKeyboardArrowDown,
   MdOutlineAssessment,
-  MdOutlinePayments,
+  MdOutlineDashboardCustomize,
 } from "react-icons/md";
 import { PiUsersThree } from "react-icons/pi";
 import { GiTakeMyMoney } from "react-icons/gi";
@@ -26,61 +21,28 @@ import { BiSolidReport } from "react-icons/bi";
 const Sidebar = ({ setActiveComponent }) => {
   const [selectedC, setSelectedC] = useState("dashboard");
   const [openReportsMenu, setOpenReportsMenu] = useState(false);
-  const [lastOpenedMenu, setLastOpenedMenu] = useState(null);
-
-  const sidebarRef = useRef(null);
-
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { currentUser } = useSelector((state) => state.user);
   const MySwal = withReactContent(Swal);
 
-  // Close all dropdowns except the specified one
-  const closeOtherDropdowns = (menuToKeepOpen) => {
-    if (menuToKeepOpen !== "reports") setOpenReportsMenu(false);
-    setLastOpenedMenu(menuToKeepOpen);
-  };
-
   // Handle dropdown toggle
-  const handleDropdownToggle = (menuType) => {
-    let shouldOpen = false;
-
-    switch (menuType) {
-      case "reports":
-        shouldOpen = !openReportsMenu;
-        setOpenReportsMenu(shouldOpen);
-        break;
-      default:
-        break;
-    }
-
-    if (shouldOpen) {
-      closeOtherDropdowns(menuType);
-    } else {
-      setLastOpenedMenu(null);
-    }
+  const handleDropdownToggle = () => {
+    setOpenReportsMenu(!openReportsMenu);
   };
 
-  // Handle component selection
+  // Handle main menu selection (internal component switch)
   const handleComponentSelect = (componentValue) => {
     setSelectedC(componentValue);
     setActiveComponent(componentValue);
     setOpenReportsMenu(false);
   };
 
-  // Handle sub-item click
-  const handleSubItemClick = (componentValue, parentMenu) => {
+  // Handle sub‑item click (reports)
+  const handleSubItemClick = (componentValue) => {
     setSelectedC(componentValue);
     setActiveComponent(componentValue);
-    setLastOpenedMenu(parentMenu);
-
-    switch (parentMenu) {
-      case "reports":
-        setOpenReportsMenu(true);
-        break;
-      default:
-        break;
-    }
+    setOpenReportsMenu(true);
   };
 
   const handleSignOut = () => {
@@ -101,184 +63,199 @@ const Sidebar = ({ setActiveComponent }) => {
     });
   };
 
-  // Main Menu Items for Employee Loan Management System
-  const mainMenuItems = [
+  // Define all menu items (with role‑based access later)
+  const AllComponents = [
+    // Main loan management dashboard
     {
       name: "داشبورد اصلی",
       value: "dashboard",
       icon: <FaHome />,
-      description: "مشاهده آمار و اطلاعات کلی",
+      role: ["admin", "reception"],
     },
     {
       name: "مدیریت کارمندان",
       value: "employees",
       icon: <PiUsersThree />,
-      description: "ثبت و مدیریت اطلاعات کارمندان",
+      role: ["admin", "reception"],
     },
-
     {
       name: "مدیریت قرضه‌ها",
       value: "loans",
       icon: <GiTakeMyMoney />,
-      description: "مشاهده و مدیریت قرضه‌های فعال و بسته شده",
+      role: ["admin", "reception"],
+    },
+    // Reports dropdown (special handling)
+    {
+      name: "گزارش‌ها",
+      value: "reports", // not a real component, used for dropdown
+      icon: <BiSolidReport />,
+      role: ["admin", "reception"],
+      isDropdown: true,
+    },
+    // Financial dashboard (navigates to /dashboard)
+    {
+      name: "داشبورد مالی",
+      value: "financialDashboard",
+      icon: <MdOutlineDashboardCustomize />,
+      role: ["admin", "reception"],
+      isNavigate: true,
+    },
+    {
+      name: "خروج",
+      value: "signout",
+      icon: <FaSignOutAlt />,
+      role: ["admin", "reception"],
+      isSignOut: true,
     },
   ];
 
-  // Report Sub-menu Items
+  // Report sub‑items
   const reportItems = [
     {
       name: "گزارش کلی شرکت",
       value: "companyReport",
       icon: <MdOutlineAssessment />,
-      description: "گزارش کلی از وضعیت مالی شرکت",
     },
     {
       name: "گزارش کارمندان",
       value: "employeeReport",
       icon: <FaChartPie />,
-      description: "گزارش قرضه‌های هر کارمند",
     },
-  
   ];
 
-  // Add scroll event listener
-  useEffect(() => {
-    const sidebar = sidebarRef.current;
-    if (sidebar) {
-      const isScrollable = sidebar.scrollHeight > sidebar.clientHeight;
-      if (isScrollable) {
-        sidebar.classList.add("has-scroll");
-      }
-    }
-  }, []);
+  // Role‑based filtering
+  let accessibleComponents = [];
+  if (currentUser && currentUser.role) {
+    const userRole = currentUser.role;
+    accessibleComponents = AllComponents.filter((component) =>
+      component.role.includes(userRole)
+    );
+  } else {
+    // Fallback for unauthenticated users (show nothing but signout maybe)
+    accessibleComponents = AllComponents.filter(
+      (component) => component.value === "signout"
+    );
+  }
 
   return (
-    <div className="h-full w-64 relative flex flex-col bg-slate-900 text-white overflow-hidden shadow-2xl">
-      {/* Fixed Header */}
-      <header className="flex-shrink-0 flex items-center gap-3 px-5 py-2 border-b border-gray-700">
+    <div className="h-full transition-all duration-300 ease-in-out w-64 bg-cyan-800 overflow-y-hidden">
+      <header className="flex items-center gap-5 p-5 text-white font-bold text-xl">
         <div className="flex items-center justify-center p-1 bg-white rounded-full">
           <img src="/logo.png" alt="Logo" className="h-8 w-8 rounded-full" />
         </div>
-        <div className="flex flex-col">
-          <span className="text-lg font-bold text-teal-500">
-             مدیریت قرضه
-          </span>
-          <span className="text-xs text-gray-400">کارمندان</span>
-        </div>
+        <span className="text-lg font-semibold text-white whitespace-nowrap">
+          غرب سی تی پی
+        </span>
       </header>
 
-      {/* Scrollable Menu Area */}
-      <div
-        ref={sidebarRef}
-        className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar"
-      >
-        <ul className="space-y-1">
-          {/* Main Menu Items */}
-          {mainMenuItems.map((item, index) => (
-            <li key={index} className="relative group">
-              <button
-                onClick={() => handleComponentSelect(item.value)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                  selectedC === item.value
-                    ? "bg-teal-700 text-white shadow-lg "
-                    : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                }`}
-                title={item.description}
-              >
-                <span className="text-xl">{item.icon}</span>
-                <span className="flex-1 text-right text-sm font-medium">
-                  {item.name}
-                </span>
-              </button>
-            </li>
-          ))}
-
-          {/* Reports Dropdown Menu */}
-          <li className="relative group mt-2">
-            <div>
-              {/* Main Reports button */}
-              <button
-                onClick={() => handleDropdownToggle("reports")}
-                className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-300 ${
-                  openReportsMenu
-                    ? "bg-teal-700 text-white shadow-lg "
-                    : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">
-                    <BiSolidReport />
+      <ul className="mr-1 px-3">
+        {accessibleComponents.map((component, index) => {
+          // Handle sign‑out
+          if (component.value === "signout") {
+            return (
+              <li key={index} className="relative group cursor-pointer">
+                <a
+                  onClick={handleSignOut}
+                  className="relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md hover:bg-white hover:bg-opacity-20 text-white hover:text-black"
+                >
+                  <span className="text-xl">{component.icon}</span>
+                  <span className="mr-4 text-lg font-semibold whitespace-nowrap">
+                    {component.name}
                   </span>
-                  <span className="text-sm font-medium">گزارش‌ها</span>
-                </div>
-                <MdKeyboardArrowDown
-                  size={20}
-                  className={`transition-transform duration-300 ${
-                    openReportsMenu ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
+                </a>
+              </li>
+            );
+          }
 
-              {/* Reports Sub Menu */}
-              {openReportsMenu && (
-                <ul className="mt-1 mr-6 space-y-1 border-r-2 border-teal-700 pr-2">
-                  {reportItems.map((report, index) => (
-                    <li key={index}>
-                      <button
-                        onClick={() =>
-                          handleSubItemClick(report.value, "reports")
-                        }
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg transition-all duration-300 ${
-                          selectedC === report.value
-                            ? "bg-teal-700 text-white"
-                            : "text-gray-400 hover:bg-gray-700 hover:text-white"
+          // Handle financial dashboard navigation
+          if (component.isNavigate) {
+            return (
+              <li key={index} className="relative group cursor-pointer">
+                <a
+                  onClick={() => navigate("/dashboard")}
+                  className="relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md hover:bg-white hover:bg-opacity-20 text-white"
+                >
+                  <span className="text-xl">{component.icon}</span>
+                  <span className="mr-4 text-lg font-semibold whitespace-nowrap">
+                    {component.name}
+                  </span>
+                </a>
+              </li>
+            );
+          }
+
+          // Handle reports dropdown
+          if (component.isDropdown) {
+            return (
+              <li key={index} className="relative group cursor-pointer">
+                <div>
+                  <a
+                    onClick={handleDropdownToggle}
+                    className={`relative flex items-center justify-between w-full px-6 py-3 transition-all duration-300 rounded-md ${openReportsMenu
+                        ? "bg-white text-gray-800"
+                        : "hover:bg-white hover:bg-opacity-20 text-white"
+                      }`}
+                  >
+                    <div className="flex items-center">
+                      <span className="text-xl">{component.icon}</span>
+                      <span className="mr-4 text-lg font-semibold whitespace-nowrap">
+                        {component.name}
+                      </span>
+                    </div>
+                    <MdKeyboardArrowDown
+                      size={20}
+                      className={`transition-transform duration-300 ${openReportsMenu ? "rotate-180" : ""
                         }`}
-                        title={report.description}
-                      >
-                        <span className="text-base">{report.icon}</span>
-                        <span className="text-right">{report.name}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </li>
+                    />
+                  </a>
 
-          {/* Sign Out Button */}
-          {currentUser && (
-            <li className="absolute bottom-4 left-3 right-3">
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 text-gray-300 hover:bg-red-600 hover:text-white"
+                  {/* Reports Sub Menu */}
+                  {openReportsMenu && (
+                    <ul className="mt-1 mr-6 space-y-1 border-r-2 border-white pr-2">
+                      {reportItems.map((report, idx) => (
+                        <li key={idx}>
+                          <a
+                            onClick={() => handleSubItemClick(report.value)}
+                            className={`relative flex items-center w-full px-6 py-2 text-sm rounded-md transition-all duration-300 ${selectedC === report.value
+                                ? "bg-white text-gray-800"
+                                : "text-gray-200 hover:bg-white hover:bg-opacity-20 hover:text-white"
+                              }`}
+                          >
+                            <span className="text-base">{report.icon}</span>
+                            <span className="mr-4 whitespace-nowrap">
+                              {report.name}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </li>
+            );
+          }
+
+          // Normal main menu items
+          return (
+            <li key={index} className="relative group cursor-pointer">
+              <a
+                onClick={() => handleComponentSelect(component.value)}
+                onMouseEnter={() => { }}
+                onMouseLeave={() => { }}
+                className={`relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md ${selectedC === component.value
+                    ? "bg-white text-gray-800"
+                    : "hover:bg-white hover:bg-opacity-20 text-white"
+                  }`}
               >
-                <span className="text-xl">
-                  <FaSignOutAlt />
+                <span className="text-xl">{component.icon}</span>
+                <span className="mr-4 text-lg font-semibold whitespace-nowrap">
+                  {component.name}
                 </span>
-                <span className="text-sm font-medium">خروج از سیستم</span>
-              </button>
+              </a>
             </li>
-          )}
-        </ul>
-      </div>
-
-      {/* Custom Scrollbar Styles */}
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: #374151;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #06b6d4;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #0891b2;
-        }
-      `}</style>
+          );
+        })}
+      </ul>
     </div>
   );
 };

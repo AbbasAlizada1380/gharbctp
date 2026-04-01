@@ -14,22 +14,24 @@ const MainContent = ({ activeComponent }) => {
   const { currentUser } = useSelector((state) => state.user);
 
   const userRole = currentUser?.role;
+  console.log(userRole);
+
 
   const renderContent = () => {
-    // ✅ Reception → دسترسی به همه صفحات سیستم قرضه
-    if (userRole === "reception") {
-      // اگر کامپوننت فعال نباشد، داشبورد را نشان بده
-      if (!activeComponent || activeComponent === "home") {
-        return <Dashboard />;
-      }
-    }
+    // // ✅ Reception → دسترسی به همه صفحات سیستم قرضه
+    // if (userRole === "reception") {
+    //   // اگر کامپوننت فعال نباشد، داشبورد را نشان بده
+    //   if (!activeComponent || activeComponent === "home") {
+    //     return <Dashboard />;
+    //   }
+    // }
 
-    // 👑 Admin → دسترسی کامل
-    if (userRole === "admin") {
-      if (!activeComponent || activeComponent === "home") {
-        return <Dashboard />;
-      }
-    }
+    // // 👑 Admin → دسترسی کامل
+    // if (userRole === "admin") {
+    //   if (!activeComponent || activeComponent === "home") {
+    //     return <Dashboard />;
+    //   }
+    // }
 
     // 🎯 مسیریابی بر اساس کامپوننت فعال
     switch (activeComponent) {
@@ -79,7 +81,7 @@ const MainContent = ({ activeComponent }) => {
 
   // اطمینان از اینکه کاربر دسترسی لازم را دارد
   const hasAccess = () => {
-    if (userRole === "admin" || userRole === "reception") {
+    if (userRole === "admin" || userRole === "reception" || userRole == "FinancialManager") {
       return true;
     }
     return false;
