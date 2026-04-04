@@ -94,7 +94,7 @@ const Sidebar = ({ setActiveComponent }) => {
     },
     // Financial dashboard (navigates to /dashboard)
     {
-      name: "داشبورد مالی",
+      name: "داشبورد مدیریت",
       value: "financialDashboard",
       icon: <MdOutlineDashboardCustomize />,
       role: ["admin", "reception"],
@@ -173,7 +173,7 @@ const Sidebar = ({ setActiveComponent }) => {
               <li key={index} className="relative group cursor-pointer">
                 <a
                   onClick={() => navigate("/dashboard")}
-                  className="relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md hover:bg-white hover:bg-opacity-20 text-white"
+                  className="relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md hover:bg-white hover:bg-opacity-20 text-white hover:text-black"
                 >
                   <span className="text-xl">{component.icon}</span>
                   <span className="mr-4 text-lg font-semibold whitespace-nowrap">
@@ -193,7 +193,7 @@ const Sidebar = ({ setActiveComponent }) => {
                     onClick={handleDropdownToggle}
                     className={`relative flex items-center justify-between w-full px-6 py-3 transition-all duration-300 rounded-md ${openReportsMenu
                         ? "bg-white text-gray-800"
-                        : "hover:bg-white hover:bg-opacity-20 text-white"
+                        : "hover:bg-white hover:text-black hover:bg-opacity-20 text-white"
                       }`}
                   >
                     <div className="flex items-center">
@@ -217,8 +217,8 @@ const Sidebar = ({ setActiveComponent }) => {
                           <a
                             onClick={() => handleSubItemClick(report.value)}
                             className={`relative flex items-center w-full px-6 py-2 text-sm rounded-md transition-all duration-300 ${selectedC === report.value
-                                ? "bg-white text-gray-800"
-                                : "text-gray-200 hover:bg-white hover:bg-opacity-20 hover:text-white"
+                                ? "bg-white text-black"
+                                : "text-gray-200 hover:bg-white hover:bg-opacity-20 hover:text-black"
                               }`}
                           >
                             <span className="text-base">{report.icon}</span>
@@ -244,7 +244,7 @@ const Sidebar = ({ setActiveComponent }) => {
                 onMouseLeave={() => { }}
                 className={`relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md ${selectedC === component.value
                     ? "bg-white text-gray-800"
-                    : "hover:bg-white hover:bg-opacity-20 text-white"
+                    : "hover:bg-white hover:bg-opacity-20 text-white hover:text-black"
                   }`}
               >
                 <span className="text-xl">{component.icon}</span>

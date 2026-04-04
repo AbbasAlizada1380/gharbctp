@@ -196,7 +196,7 @@ const Sidebar = ({ setActiveComponent }) => {
                 ${
                   activeC === component.value
                     ? "bg-white text-gray-800"
-                    : "hover:bg-white hover:bg-opacity-20 text-white"
+                    : "hover:bg-red-500  text-white"
                 }`}
               >
                 <span className="text-xl">{component.icon}</span>
