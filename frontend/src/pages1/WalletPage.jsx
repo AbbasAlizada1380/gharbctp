@@ -5,7 +5,6 @@ import {
   getEmployeeWallet,
   makePayment,
   getLoanPayments,
-  formatMoney,
   getEmployeesWithActiveLoans,
 } from "../pages/dashboard/services/EmployeesService";
 import { toast } from "react-hot-toast";
@@ -132,7 +131,7 @@ const WalletPage = () => {
             <div>
               <p className="text-sm text-gray-600">مجموع قرضه‌ها</p>
               <p className="text-2xl font-bold text-blue-600">
-                {formatMoney(walletSummary.totalLoans)} AFN
+                { (walletSummary.totalLoans)} AFN
               </p>
             </div>
             <div className="bg-blue-100 p-3 rounded-full">
@@ -146,7 +145,7 @@ const WalletPage = () => {
             <div>
               <p className="text-sm text-gray-600">مجموع پرداخت‌ها</p>
               <p className="text-2xl font-bold text-green-600">
-                {formatMoney(walletSummary.totalPaid)} AFN
+                { (walletSummary.totalPaid)} AFN
               </p>
             </div>
             <div className="bg-green-100 p-3 rounded-full">
@@ -160,7 +159,7 @@ const WalletPage = () => {
             <div>
               <p className="text-sm text-gray-600">باقی‌مانده کل</p>
               <p className="text-2xl font-bold text-yellow-600">
-                {formatMoney(walletSummary.totalRemaining)} AFN
+                { (walletSummary.totalRemaining)} AFN
               </p>
             </div>
             <div className="bg-yellow-100 p-3 rounded-full">
@@ -229,7 +228,7 @@ const WalletPage = () => {
                     <div>
                       <span className="text-gray-600">کل قرضه:</span>
                       <span className="mr-1 font-medium">
-                        {formatMoney(wallet.totalLoans)}
+                        { (wallet.totalLoans)}
                       </span>
                     </div>
                     <div>
@@ -241,7 +240,7 @@ const WalletPage = () => {
                             : "text-green-600"
                         }`}
                       >
-                        {formatMoney(wallet.remainingBalance)}
+                        { (wallet.remainingBalance)}
                       </span>
                     </div>
                   </div>
@@ -283,7 +282,7 @@ const WalletPage = () => {
                     <div>
                       <p className="text-sm text-gray-600">معاش:</p>
                       <p className="font-medium">
-                        {formatMoney(employeeWalletData.data.salary)} AFN
+                        { (employeeWalletData.data.salary)} AFN
                       </p>
                     </div>
                   </div>
@@ -369,7 +368,7 @@ const WalletPage = () => {
                                 مقدار قرضه
                               </p>
                               <p className="text-lg font-bold text-blue-600">
-                                {formatMoney(loan.amount)} AFN
+                                { (loan.amount)} AFN
                               </p>
                               <p className="text-sm text-gray-600 mt-1">
                                 باقی‌مانده:
@@ -381,7 +380,7 @@ const WalletPage = () => {
                                     : "text-green-600"
                                 }`}
                               >
-                                {formatMoney(loan.remainingAmount)} AFN
+                                { (loan.remainingAmount)} AFN
                               </p>
                             </div>
                           </div>
@@ -440,13 +439,13 @@ const WalletPage = () => {
                                   مقدار قرضه
                                 </p>
                                 <p className="text-lg font-bold text-blue-600">
-                                  {formatMoney(loan.amount)} AFN
+                                  { (loan.amount)} AFN
                                 </p>
                                 <p className="text-sm text-gray-600 mt-1">
                                   باقی‌مانده:
                                 </p>
                                 <p className="font-medium text-yellow-600">
-                                  {formatMoney(loan.remainingAmount)} AFN
+                                  { (loan.remainingAmount)} AFN
                                 </p>
                               </div>
                             </div>
@@ -510,7 +509,7 @@ const WalletPage = () => {
                                       مبلغ پرداخت
                                     </p>
                                     <p className="text-lg font-bold text-green-600">
-                                      {formatMoney(payment.amount)} AFN
+                                      { (payment.amount)} AFN
                                     </p>
                                   </div>
                                 </div>
@@ -540,7 +539,7 @@ const WalletPage = () => {
                                   )}
                                 </p>
                                 <p className="text-sm text-gray-600">
-                                  مبلغ: {formatMoney(loan.amount)} AFN
+                                  مبلغ: { (loan.amount)} AFN
                                 </p>
                               </div>
                               <span className="text-blue-600 text-sm">

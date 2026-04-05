@@ -393,7 +393,7 @@ const EmployeesPage = () => {
                             : "bg-gray-100 text-gray-800"
                         }`}
                       >
-                        {formatMoney(employee.Wallet?.remainingBalance || 0)}{" "}
+                        {(employee.Wallet?.remainingBalance || 0)}{" "}
                         AFN
                       </span>
                     </td>
@@ -540,7 +540,7 @@ const EmployeesPage = () => {
                 onChange={handleInputChange}
                 required
                 className="w-full p-3 bg-gray-200 border-gray-300 rounded-md focus:ring-1 focus:ring-teal-700 focus:border-transparent focus:outline-none"
-                placeholder="مثال: ۰۷۹۱۲۳۴۵۶۷"
+                placeholder="مثال: 0771234567"
               />
             </div>
 

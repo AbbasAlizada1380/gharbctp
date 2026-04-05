@@ -26,25 +26,18 @@ const LoanPrintReceipt = ({
     return safeNum.toLocaleString() + " افغانی";
   };
 
-  const formatToJalali = (dateString) => {
-    if (!dateString) return "-";
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return "-";
-
-      const { jy, jm, jd } = jalaali.toJalaali(
-        date.getFullYear(),
-        date.getMonth() + 1,
-        date.getDate(),
-      );
-      const pad = (n) => (n < 10 ? "0" + n : n);
-      return `${jy}/${pad(jm)}/${pad(jd)}`;
-    } catch (error) {
-      console.error("Date parsing error:", error);
-      return "-";
-    }
-  };
-
+const formatToGregorian = (dateString) => {
+  if (!dateString) return "-";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "-";
+    // Returns "4/5/2026" (month/day/year, no leading zeros)
+    return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+  } catch (error) {
+    console.error("Date parsing error:", error);
+    return "-";
+  }
+};
   const calculatePaidAmount = () => {
     if (!payments || payments.length === 0) return 0;
 
@@ -137,7 +130,7 @@ const LoanPrintReceipt = ({
               </div>
               <div>
                 <span className="font-bold">تاریخ قرضه: </span>
-                <span>{formatToJalali(loan.loanDate)}</span>
+                <span>{formatToGregorian(loan.loanDate)}</span>
               </div>
             </div>
           </div>
@@ -226,7 +219,7 @@ const LoanPrintReceipt = ({
                     >
                       <span className="text-center">{index + 1}</span>
                       <span className="text-center">
-                        {formatToJalali(payment.paymentDate)}
+                        {formatToGregorian(payment.paymentDate)}
                       </span>
                       <span className="text-center font-medium text-green-600">
                         {formatCurrency(paymentAmount)}
@@ -263,7 +256,7 @@ const LoanPrintReceipt = ({
               </div>
             </div>
             <p className="text-center text-xs text-gray-500 mt-4">
-              تاریخ چاپ: {new Date().toLocaleDateString("fa-AF")}
+              تاریخ چاپ: {new Date().toLocaleDateString("eng-en")}
             </p>
           </div>
         </div>

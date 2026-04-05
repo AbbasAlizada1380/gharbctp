@@ -261,9 +261,9 @@ const LoansPage = () => {
             <div>
               <p className="text-sm text-gray-600">مجموع باقی‌مانده</p>
               <p className=" font-bold text-teal-700">
-                {formatMoney(
-                  activeLoansData?.data?.summary?.totalRemainingAmount || 0,
-                )}{" "}
+                {
+                  activeLoansData?.data?.summary?.totalRemainingAmount || 0
+                }{" "}
                 اف
               </p>
             </div>
@@ -310,33 +310,30 @@ const LoansPage = () => {
           <div className="flex">
             <button
               onClick={() => setActiveTab("active")}
-              className={`px-6 py-3 font-medium text-sm  cursor-pointer flex items-center gap-2 ${
-                activeTab === "active"
+              className={`px-6 py-3 font-medium text-sm  cursor-pointer flex items-center gap-2 ${activeTab === "active"
                   ? "border-b-2 border-teal-600 text-teal-700"
                   : "text-gray-600 hover:text-gray-800"
-              }`}
+                }`}
             >
               <FaMoneyBillWave />
               قرضه‌های فعال
             </button>
             <button
               onClick={() => setActiveTab("closed")}
-              className={`px-6 py-3 font-medium text-sm flex cursor-pointer items-center gap-2 ${
-                activeTab === "closed"
+              className={`px-6 py-3 font-medium text-sm flex cursor-pointer items-center gap-2 ${activeTab === "closed"
                   ? "border-b-2 border-teal-600 text-teal-700"
                   : "text-gray-600 hover:text-gray-800"
-              }`}
+                }`}
             >
               <FaCheckCircle />
               قرضه‌های تسویه شده
             </button>
             <button
               onClick={() => setActiveTab("history")}
-              className={`px-6 py-3 font-medium text-sm flex cursor-pointer items-center gap-2 ${
-                activeTab === "history"
+              className={`px-6 py-3 font-medium text-sm flex cursor-pointer items-center gap-2 ${activeTab === "history"
                   ? "border-b-2 border-teal-600 text-teal-700"
                   : "text-gray-600 hover:text-gray-800"
-              }`}
+                }`}
             >
               <FaHistory />
               تاریخچه پرداخت‌ها
@@ -391,20 +388,20 @@ const LoansPage = () => {
                           <div>
                             <p className="text-sm text-gray-500">مبلغ قرضه</p>
                             <p className="font-bold text-teal-700">
-                              {formatMoney(loan.amount)} AFN
+                              { (loan.amount)} AFN
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">باقی‌مانده</p>
                             <p className="font-bold text-red-600">
-                              {formatMoney(loan.remainingAmount)} AFN
+                              { (loan.remainingAmount)} AFN
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">تاریخ قرضه</p>
                             <p className="text-sm">
                               {new Date(loan.loanDate).toLocaleDateString(
-                                "fa-AF",
+                                "eng-en",
                               )}
                             </p>
                           </div>
@@ -485,12 +482,12 @@ const LoansPage = () => {
                                 <span>{index + 1}</span>
 
                                 <span className="font-medium text-green-600">
-                                  {formatMoney(payment.amount)} AFN
+                                  { (payment.amount)} AFN
                                 </span>
                                 <span>
                                   {new Date(
                                     payment.paymentDate,
-                                  ).toLocaleDateString("fa-AF")}
+                                  ).toLocaleDateString("eng-en")}
                                 </span>
                               </div>
                             ))}
@@ -534,7 +531,7 @@ const LoansPage = () => {
                           <div>
                             <p className="text-xs text-gray-500">مبلغ قرضه</p>
                             <p className="font-medium">
-                              {formatMoney(loan.amount)} AFN
+                              { (loan.amount)} AFN
                             </p>
                           </div>
                           <div>
@@ -602,7 +599,7 @@ const LoansPage = () => {
                               )}
                             </span>
                             <span className="font-medium text-green-600">
-                              {formatMoney(payment.amount)} AFN
+                              { (payment.amount)} AFN
                             </span>
                           </div>
                         ))
@@ -739,10 +736,9 @@ const LoansPage = () => {
                 <div className="flex items-center gap-x-3">
                   <p className="text-xs text-gray-500">باقی‌مانده</p>
                   <p className="font-bold text-red-600">
-                    {formatMoney(
+                    {
                       activeLoans.find((l) => l.id === selectedLoan)
-                        ?.remainingAmount || 0,
-                    )}{" "}
+                        ?.remainingAmount || 0}{" "}
                   </p>
                 </div>
               )}

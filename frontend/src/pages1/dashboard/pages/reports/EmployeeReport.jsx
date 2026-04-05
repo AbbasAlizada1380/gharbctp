@@ -121,17 +121,15 @@ const EmployeeReport = () => {
                     <div
                       key={emp.id}
                       onClick={() => setSelectedEmployee(emp.id)}
-                      className={`p-4 cursor-pointer transition-all ${
-                        isSelected
-                          ? "bg-teal-50 border-r-4 border-teal-700"
-                          : "hover:bg-gray-50"
-                      }`}
+                      className={`p-4 cursor-pointer transition-all ${isSelected
+                        ? "bg-teal-50 border-r-4 border-teal-700"
+                        : "hover:bg-gray-50"
+                        }`}
                     >
                       <div className="flex items-start gap-3">
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            isSelected ? "bg-teal-700" : "bg-gray-200"
-                          }`}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isSelected ? "bg-teal-700" : "bg-gray-200"
+                            }`}
                         >
                           <FaUser
                             className={
@@ -143,9 +141,8 @@ const EmployeeReport = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2  text-gray-500 mt-1">
                             <h3
-                              className={`font-medium truncate ${
-                                isSelected ? "text-teal-700" : "text-gray-900"
-                              }`}
+                              className={`font-medium truncate ${isSelected ? "text-teal-700" : "text-gray-900"
+                                }`}
                             >
                               {emp.fullName}
                             </h3>
@@ -156,17 +153,16 @@ const EmployeeReport = () => {
 
                           <div className="flex items-center justify-between mt-2">
                             <span
-                              className={`text-xs px-2 py-0.5 rounded-full ${
-                                hasActiveLoan
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-green-100 text-green-800"
-                              }`}
+                              className={`text-xs px-2 py-0.5 rounded-full ${hasActiveLoan
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-green-100 text-green-800"
+                                }`}
                             >
                               {hasActiveLoan ? "دارای قرضه" : "بدون قرضه"}
                             </span>
                             {hasActiveLoan && (
                               <span className="text-xs font-medium text-yellow-600">
-                                {formatMoney(emp.Wallet?.remainingBalance)} AFN
+                                {(emp.Wallet?.remainingBalance)} AFN
                               </span>
                             )}
                           </div>
@@ -232,13 +228,13 @@ const EmployeeReport = () => {
                 <div className="bg-gray-100 rounded-md shadow p-4">
                   <p className="text-xs text-gray-500">مجموع قرضه‌ها</p>
                   <p className="text-base font-bold text-teal-700 mt-1">
-                    {formatMoney(statistics.totalAmount)} AFN
+                    {(statistics.totalAmount)} AFN
                   </p>
                 </div>
                 <div className="bg-gray-100 rounded-md shadow p-4">
                   <p className="text-xs text-gray-500">مجموع پرداخت‌ها</p>
                   <p className="text-base font-bold text-purple-600 mt-1">
-                    {formatMoney(statistics.totalPaid)} AFN
+                    {(statistics.totalPaid)} AFN
                   </p>
                 </div>
               </div>
@@ -271,11 +267,10 @@ const EmployeeReport = () => {
                           <div className="flex justify-between items-start mb-3">
                             <div className="flex items-center gap-2">
                               <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  loan.status === "Active"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-green-100 text-green-800"
-                                }`}
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${loan.status === "Active"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                                  }`}
                               >
                                 {loan.status === "Active"
                                   ? "فعال"
@@ -309,7 +304,7 @@ const EmployeeReport = () => {
                             <div>
                               <p className="text-xs text-gray-500">مبلغ قرضه</p>
                               <p className="font-bold text-teal-700">
-                                {formatMoney(loan.amount)} AFN
+                                {(loan.amount)} AFN
                               </p>
                             </div>
                             <div>
@@ -317,9 +312,7 @@ const EmployeeReport = () => {
                                 پرداخت شده
                               </p>
                               <p className="font-bold text-green-600">
-                                {formatMoney(
-                                  loan.amount - loan.remainingAmount,
-                                )}{" "}
+                                {loan.amount - loan.remainingAmount}{" "}
                                 AFN
                               </p>
                             </div>
@@ -328,13 +321,12 @@ const EmployeeReport = () => {
                                 باقی‌مانده
                               </p>
                               <p
-                                className={`font-bold ${
-                                  loan.remainingAmount > 0
-                                    ? "text-yellow-600"
-                                    : "text-green-600"
-                                }`}
+                                className={`font-bold ${loan.remainingAmount > 0
+                                  ? "text-yellow-600"
+                                  : "text-green-600"
+                                  }`}
                               >
-                                {formatMoney(loan.remainingAmount)} AFN
+                                {(loan.remainingAmount)} AFN
                               </p>
                             </div>
                           </div>
@@ -359,11 +351,11 @@ const EmployeeReport = () => {
                                       <span className="text-gray-600">
                                         {new Date(
                                           payment.paymentDate,
-                                        ).toLocaleDateString("fa-AF")}
+                                        ).toLocaleDateString("eng-en")}
                                       </span>
                                     </div>
                                     <span className="font-medium text-green-600">
-                                      {formatMoney(payment.amount)} AFN
+                                      {(payment.amount)} AFN
                                     </span>
                                   </div>
                                 ))}

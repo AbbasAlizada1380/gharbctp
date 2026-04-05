@@ -74,7 +74,7 @@ const CompanyReport = () => {
             <div>
               <p className="text-sm text-gray-600">مجموع قرضه‌ها</p>
               <p className="text-base font-bold text-teal-700">
-                {formatMoney(summary.totalLoanAmount || 0)}
+                {(summary.totalLoanAmount || 0)}
               </p>
             </div>
             <div className="bg-white p-3 rounded-md">
@@ -89,7 +89,7 @@ const CompanyReport = () => {
             <div>
               <p className="text-sm text-gray-600">باقی‌مانده کل</p>
               <p className="text-base font-bold text-red-600">
-                {formatMoney(summary.totalRemainingBalance || 0)}
+                {(summary.totalRemainingBalance || 0)}
               </p>
             </div>
             <div className="bg-white p-3 rounded-md">
@@ -116,13 +116,13 @@ const CompanyReport = () => {
                         {loan.Employee?.fullName}
                       </span>
                       <span className="text-sm text-gray-600">
-                        {new Date(loan.loanDate).toLocaleDateString("fa-AF")}
+                        {new Date(loan.loanDate).toLocaleDateString("eng-en")}
                       </span>
                     </div>
                     <div className="flex justify-between mt-2">
                       <span className="text-sm text-gray-600">مقدار:</span>
                       <span className="font-medium text-teal-700">
-                        {formatMoney(loan.amount)} AFN
+                        {(loan.amount)} AFN
                       </span>
                     </div>
                   </div>
@@ -152,14 +152,14 @@ const CompanyReport = () => {
                       </span>
                       <span className="text-sm text-gray-600">
                         {new Date(payment.paymentDate).toLocaleDateString(
-                          "fa-AF",
+                          "eng-en",
                         )}
                       </span>
                     </div>
                     <div className="flex justify-between mt-2">
                       <span className="text-sm text-gray-600">مبلغ:</span>
                       <span className="font-medium text-teal-700">
-                        {formatMoney(payment.amount)} AFN
+                        {(payment.amount)} AFN
                       </span>
                     </div>
                   </div>
