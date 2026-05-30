@@ -19,6 +19,11 @@ const Income = sequelize.define(
     },
     spent: {
       type: DataTypes.STRING,
+    },
+    sellerId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: { model: 'Sellers', key: 'id' }
     }
   },
   {

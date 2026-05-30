@@ -88,6 +88,11 @@ const Sidebar = ({ setActiveComponent }) => {
       icon: <MdAttachMoney />,
     },
     {
+      name: "فروشنده ها",
+      value: "Sellers",
+      icon: <MdBadge />,
+    },
+    {
       name: "کارمندان",
       value: "StaffManager",
       icon: <MdBadge />,
@@ -171,11 +176,10 @@ const Sidebar = ({ setActiveComponent }) => {
               <a
                 onClick={handleSignOut}
                 className={`relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md
-                ${
-                  activeC === component.value
+                ${activeC === component.value
                     ? "bg-white text-gray-800"
                     : "hover:bg-white hover:bg-opacity-20 text-white hover:text-black"
-                }`}
+                  }`}
               >
                 <span className="text-xl">{component.icon}</span>
                 <span className="mr-4 text-lg font-semibold whitespace-nowrap">
@@ -193,11 +197,10 @@ const Sidebar = ({ setActiveComponent }) => {
                 onMouseEnter={() => setActiveC(component.value)}
                 onMouseLeave={() => setActiveC(selectedC)}
                 className={`relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md
-                ${
-                  activeC === component.value
+                ${activeC === component.value
                     ? "bg-white text-gray-800"
                     : "hover:bg-red-500  text-white"
-                }`}
+                  }`}
               >
                 <span className="text-xl">{component.icon}</span>
                 <span className="mr-4 text-lg font-semibold whitespace-nowrap">
@@ -214,11 +217,10 @@ const Sidebar = ({ setActiveComponent }) => {
                 onMouseEnter={() => setActiveC(component.value)}
                 onMouseLeave={() => setActiveC(selectedC)}
                 className={`relative flex items-center w-full px-6 py-3 transition-all duration-300 rounded-md
-                ${
-                  activeC === component.value
+                ${activeC === component.value
                     ? "bg-white text-gray-800"
                     : "hover:bg-white hover:bg-opacity-20 text-white"
-                }`}
+                  }`}
               >
                 <span className="text-xl">{component.icon}</span>
                 <span className="mr-4 text-lg font-semibold whitespace-nowrap">

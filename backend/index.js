@@ -21,6 +21,7 @@ import MoneyRoute from "./routes/MoneyRoute.js";
 import ReportRoute from "./routes/Reportroute.js";
 import CompanyStockRoute from "./routes/CompanStockRoute.js";
 import PalletRoute from "./routes/PalletRoute.js";
+import SellerRoute from "./routes/Seller/SellerRoute.js";
 const FRONT_URL = process.env.FRONT_URL
 const port = 8038;
 const app = express();
@@ -88,6 +89,7 @@ app.use("/money", MoneyRoute);
 app.use("/report", ReportRoute);
 app.use("/companystock", CompanyStockRoute);
 app.use("/palletmoney", PalletRoute);
+app.use("/seller", SellerRoute);
 
 
 app.use("/employees", employeeRoutes);
