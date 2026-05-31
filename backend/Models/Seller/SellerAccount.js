@@ -27,7 +27,11 @@ const SellerAccount = sequelize.define(
       allowNull: false,
       defaultValue: [],
     },
-
+    pays: {
+      type: DataTypes.JSON,   // ✅ use JSON instead of ARRAY
+      allowNull: true,
+      defaultValue: [],
+    },
     total: {
       type: DataTypes.JSON,   // ✅ use JSON instead of ARRAY
       allowNull: false,

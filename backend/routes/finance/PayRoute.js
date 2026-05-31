@@ -1,18 +1,18 @@
 import express from "express";
 import {
-  createPay,
+  recordSellerPayment,   // renamed from createPay
   getAllPays,
   getSinglePay,
   updatePay,
   deletePay,
-  getPaysByDateRange   // <-- NEW import
+  getPaysByDateRange
 } from "../../Controllers/Finance/PayController.js";
 
 const PayRoute = express.Router();
 
-PayRoute.post("/", createPay);
+PayRoute.post("/", recordSellerPayment);
 PayRoute.get("/", getAllPays);
-PayRoute.get("/date-range", getPaysByDateRange);   // <-- NEW route (must come before "/:id")
+PayRoute.get("/date-range", getPaysByDateRange);
 PayRoute.get("/:id", getSinglePay);
 PayRoute.put("/:id", updatePay);
 PayRoute.delete("/:id", deletePay);

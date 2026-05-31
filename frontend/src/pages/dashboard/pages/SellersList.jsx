@@ -4,6 +4,8 @@ import axios from "axios";
 import { useSelector } from "react-redux";
 import Pagination from "../pagination/Pagination";
 import { FaUsers, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
+import PaySeller from "./PaySeller";
+import PaysManagement from "./PaysManagement";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const limit = 10;
@@ -332,6 +334,8 @@ const SellersList = () => {
           </form>
         </div>
       )}
+      <PaySeller />
+      <PaysManagement/>
     </div>
   );
 };

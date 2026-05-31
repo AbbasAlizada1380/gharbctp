@@ -1,8 +1,8 @@
-import { Income, Seller, Exist } from "../../Models/index.js";
+import { Income, Seller, Exist,Pay } from "../../Models/index.js";
 import sequelize from "../../dbconnection.js";
-import { v4 as uuidv4 } from 'uuid'; 
-import {Factor} from "../../Models/index.js";
-import {SellerAccount} from "../../Models/index.js";
+import { v4 as uuidv4 } from 'uuid';
+import { Factor } from "../../Models/index.js";
+import { SellerAccount } from "../../Models/index.js";
 
 /* ===========================
    Helper: Update Exist Table (with transaction)
@@ -70,27 +70,40 @@ const getOrCreateSeller = async (sellerData, transaction) => {
   }
 };
 
+export const createPayRecord = async ({ sellerId, amount, description = "", transaction = null }) => {
+  if (!sellerId || amount === undefined || amount <= 0) {
+    throw new Error("Invalid pay record data: sellerId and positive amount are required");
+  }
 
+  try {
+    const payRecord = await Pay.create({
+      seller: sellerId,            // field name is 'seller', not 'sellerId'
+      amount: parseFloat(amount),
+      description: description || `Payment to seller ID ${sellerId}`,
+    }, { transaction });
+
+    return payRecord;
+  } catch (error) {
+    console.error("Error creating pay record:", error);
+    throw error;
+  }
+};
 
 export const batchCreateIncomes = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
-    // ✅ Extract paidAmount from request body (default 0)
     const { seller, incomes, paidAmount = 0 } = req.body;
 
-    // Validate request payload
     if (!seller || !incomes || !Array.isArray(incomes) || incomes.length === 0) {
       await transaction.rollback();
       return res.status(400).json({ message: "Invalid payload: need seller and non‑empty incomes array" });
     }
 
-    // Resolve seller (create if not exists)
     const sellerRecord = await getOrCreateSeller(seller, transaction);
     const createdIncomes = [];
     let totalMoney = 0;
-    let totalSpent = 0; // sum of 'spent' from each income (e.g., consumption)
+    let totalSpent = 0;
 
-    // Process each income
     for (const item of incomes) {
       const { size, quantity, price, spent = 0 } = item;
 
@@ -125,7 +138,6 @@ export const batchCreateIncomes = async (req, res) => {
       createdIncomes.push(income);
     }
 
-    // ✅ Combine spent (from incomes) with the upfront paidAmount
     const upfrontPaid = parseFloat(paidAmount) || 0;
     if (upfrontPaid < 0) {
       await transaction.rollback();
@@ -135,29 +147,33 @@ export const batchCreateIncomes = async (req, res) => {
     const totalPaid = totalSpent + upfrontPaid;
     const remaining = totalMoney - totalPaid;
 
-    // Determine factor status
     let status = "unpaid";
     if (totalPaid >= totalMoney) status = "paid";
     else if (totalPaid > 0) status = "partial";
 
     const factorNumber = `FACT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-
-    const incomesSummary = createdIncomes.map(inc => (
-      inc.id
-    ));
+    const incomesSummary = createdIncomes.map(inc => inc.id);
 
     const factor = await Factor.create({
       factorNumber,
       sellerId: sellerRecord.id,
       totalAmount: totalMoney,
-      paidAmount: totalPaid,           // ✅ includes upfront payment
+      paidAmount: totalPaid,
       remainingAmount: remaining,
       status,
       incomes: incomesSummary,
       notes: `Batch created on ${new Date().toISOString()}. Upfront payment: ${upfrontPaid}`,
     }, { transaction });
+    if (upfrontPaid > 0) {
+      await createPayRecord({
+        sellerId: sellerRecord.id,
+        amount: upfrontPaid,
+        description: `Upfront payment for factor ${factor.factorNumber} (ID: ${factor.id})`,
+        transaction,
+      });
+    }
 
-    // ----- Update SellerAccount with the new factor ID -----
+    // Update SellerAccount
     let sellerAccount = await SellerAccount.findOne({
       where: { sellerId: sellerRecord.id },
       lock: transaction.LOCK.UPDATE,
@@ -176,32 +192,33 @@ export const batchCreateIncomes = async (req, res) => {
         unpaid: unpaidArray,
       }, { transaction });
     } else {
-      const currentTotal = Array.isArray(sellerAccount.total) ? sellerAccount.total : [];
-      const currentPaid = Array.isArray(sellerAccount.paid) ? sellerAccount.paid : [];
-      const currentUnpaid = Array.isArray(sellerAccount.unpaid) ? sellerAccount.unpaid : [];
+      let newTotal = Array.isArray(sellerAccount.total) ? [...sellerAccount.total] : [];
+      let newPaid = Array.isArray(sellerAccount.paid) ? [...sellerAccount.paid] : [];
+      let newUnpaid = Array.isArray(sellerAccount.unpaid) ? [...sellerAccount.unpaid] : [];
 
-      if (!currentTotal.includes(factor.id)) currentTotal.push(factor.id);
+      if (!newTotal.includes(factor.id)) {
+        newTotal.push(factor.id);
+      }
 
       if (status === 'paid') {
-        if (!currentPaid.includes(factor.id)) currentPaid.push(factor.id);
-        const indexInUnpaid = currentUnpaid.indexOf(factor.id);
-        if (indexInUnpaid !== -1) currentUnpaid.splice(indexInUnpaid, 1);
+        if (!newPaid.includes(factor.id)) newPaid.push(factor.id);
+        newUnpaid = newUnpaid.filter(id => id !== factor.id);
       } else if (status === 'partial' || status === 'unpaid') {
-        if (!currentUnpaid.includes(factor.id)) currentUnpaid.push(factor.id);
-        const indexInPaid = currentPaid.indexOf(factor.id);
-        if (indexInPaid !== -1) currentPaid.splice(indexInPaid, 1);
+        if (!newUnpaid.includes(factor.id)) newUnpaid.push(factor.id);
+        newPaid = newPaid.filter(id => id !== factor.id);
       }
 
       await sellerAccount.update({
-        total: currentTotal,
-        paid: currentPaid,
-        unpaid: currentUnpaid,
+        total: newTotal,
+        paid: newPaid,
+        unpaid: newUnpaid,
       }, { transaction });
     }
 
+    // ✅ COMMIT THE TRANSACTION (CRITICAL FIX)
     await transaction.commit();
 
-    // Fetch created incomes with seller details for response
+    // Fetch incomes with seller details for response
     const incomesWithSeller = await Income.findAll({
       where: { id: createdIncomes.map(i => i.id) },
       include: [{ model: Seller, as: 'seller' }],

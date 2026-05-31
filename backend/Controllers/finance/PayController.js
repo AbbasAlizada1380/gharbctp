@@ -1,230 +1,149 @@
-import { Pay, SellerAccount, sequelize, StockIncome } from "../../Models/index.js";
-import { Seller } from "../../Models/index.js";
+import { Pay, SellerAccount, Seller, Factor } from "../../Models/index.js";
 import { Op } from "sequelize";
-export const createPay = async (req, res) => {
+import sequelize from "../../dbconnection.js";
+
+
+export const recordSellerPayment = async (req, res) => {
   const transaction = await sequelize.transaction();
-
   try {
-    const { seller, amount, description } = req.body;
+    const { sellerId, amount, description = "" } = req.body;
 
-    // Validate input
-    if (!seller) {
+    if (!sellerId || !amount || amount <= 0) {
       await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Seller ID is required",
-      });
+      return res.status(400).json({ message: "Invalid request: sellerId and positive amount are required" });
     }
 
-    if (!amount || amount <= 0) {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Amount must be greater than 0",
-      });
-    }
-
-    // 1. Create the pay record
-    const pay = await Pay.create(
-      {
-        seller,
-        amount,
-        description: description || `Payment of ${amount} for seller #${seller}`,
-      },
-      { transaction }
-    );
-
-    // 2. Find the seller account
-    let sellerAccount = await SellerAccount.findOne({
-      where: { sellerId: seller },
+    // 1. Get seller account with unpaid factor IDs
+    const sellerAccount = await SellerAccount.findOne({
+      where: { sellerId },
       transaction,
     });
 
     if (!sellerAccount) {
-      // If seller account doesn't exist, create one with empty arrays
-      sellerAccount = await SellerAccount.create(
-        {
-          sellerId: seller,
-          paid: [],
-          unpaid: [],
-          total: [],
-        },
-        { transaction }
-      );
-
-      await transaction.commit();
-
-      return res.status(201).json({
-        success: true,
-        message: "Payment created successfully (new seller account)",
-        data: {
-          pay,
-          sellerAccount,
-        },
-      });
+      await transaction.rollback();
+      return res.status(404).json({ message: `Seller account not found for sellerId ${sellerId}` });
     }
 
-    // 3. Get the unpaid array and sort it (smallest ID first)
-    const unpaidIds = Array.isArray(sellerAccount.unpaid)
-      ? [...sellerAccount.unpaid].sort((a, b) => a - b) // Sort ascending (smallest first)
-      : [];
-
-    if (unpaidIds.length === 0) {
-      // No unpaid records to process
-      await transaction.commit();
-
-      return res.status(201).json({
-        success: true,
-        message: "Payment created successfully (no unpaid records to process)",
-        data: {
-          pay,
-          sellerAccount,
-        },
-      });
+    let unpaidFactorIds = sellerAccount.unpaid || [];
+    if (!Array.isArray(unpaidFactorIds) || unpaidFactorIds.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "This seller has no unpaid factors to pay" });
     }
 
-    // 4. Fetch all unpaid stock incomes for this seller
-    const unpaidStockIncomes = await StockIncome.findAll({
-      where: {
-        id: unpaidIds,
-        sellerId: seller,
-      },
-      order: [['id', 'ASC']], // Order by ID ascending (smallest first)
+    // 2. Fetch unpaid factors, ordered by creation date (oldest first – FIFO)
+    const unpaidFactors = await Factor.findAll({
+      where: { id: unpaidFactorIds },
+      order: [["createdAt", "ASC"]],
       transaction,
     });
 
+    if (unpaidFactors.length === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ message: "No unpaid factors found (IDs may be invalid)" });
+    }
+
     let remainingAmount = parseFloat(amount);
-    const processedPaidIds = [];
-    const remainingUnpaidIds = [];
+    const fullyPaidFactorIds = [];
+    const partiallyPaidFactors = [];
 
-    // 5. Process each unpaid stock income in order (smallest ID first)
-    for (const stockIncome of unpaidStockIncomes) {
-      if (remainingAmount <= 0) {
-        // No more money to distribute, keep this in unpaid
-        remainingUnpaidIds.push(stockIncome.id);
-        continue;
-      }
+    // 3. Allocate payment to factors
+    for (const factor of unpaidFactors) {
+      if (remainingAmount <= 0) break;
 
-      const stockRemaining = parseFloat(stockIncome.remaind) || 0;
+      const currentRemaining = parseFloat(factor.remainingAmount);
+      if (currentRemaining <= 0) continue;
 
-      if (stockRemaining <= 0) {
-        // This stock income has no remaining balance, should it be in unpaid?
-        // Move it to paid if it's fully paid
-        processedPaidIds.push(stockIncome.id);
-        continue;
-      }
-
-      if (remainingAmount >= stockRemaining) {
-        // Fully pay this stock income
-        remainingAmount -= stockRemaining;
-
-        // Update stock income to fully paid
-        await stockIncome.update(
-          {
-            paid: (parseFloat(stockIncome.paid) || 0) + stockRemaining,
-            remaind: 0,
-          },
-          { transaction }
-        );
-
-        // Mark as paid
-        processedPaidIds.push(stockIncome.id);
+      if (remainingAmount >= currentRemaining) {
+        // Fully pay this factor
+        remainingAmount -= currentRemaining;
+        factor.paidAmount = factor.totalAmount;
+        factor.remainingAmount = 0;
+        factor.status = "paid";
+        fullyPaidFactorIds.push(factor.id);
+        await factor.save({ transaction });
       } else {
-        // Partially pay this stock income
-        const newReceived = (parseFloat(stockIncome.paid) || 0) + remainingAmount;
-        const newRemaining = stockRemaining - remainingAmount;
-
-        await stockIncome.update(
-          {
-            paid: newReceived,
-            remaind: newRemaining,
-          },
-          { transaction }
-        );
-
-        // This stock income remains unpaid (with reduced balance)
-        remainingUnpaidIds.push(stockIncome.id);
+        // Partial payment on this factor
+        const newPaidAmount = parseFloat(factor.paidAmount) + remainingAmount;
+        const newRemaining = currentRemaining - remainingAmount;
+        factor.paidAmount = newPaidAmount;
+        factor.remainingAmount = newRemaining;
+        factor.status = "partial";
+        await factor.save({ transaction });
+        partiallyPaidFactors.push(factor.id);
         remainingAmount = 0;
+        break;
       }
     }
 
-    // If there are any unpaid stock incomes that weren't processed (beyond those we fetched)
-    // Add them to remainingUnpaidIds
-    const processedIds = unpaidStockIncomes.map(s => s.id);
-    const unprocessedIds = unpaidIds.filter(id => !processedIds.includes(id));
-    remainingUnpaidIds.push(...unprocessedIds);
+    // Overpayment check
+    if (remainingAmount > 0) {
+      await transaction.rollback();
+      const totalUnpaid = unpaidFactors.reduce((sum, f) => sum + parseFloat(f.remainingAmount), 0);
+      return res.status(400).json({
+        message: `Payment amount exceeds total unpaid balance. Unpaid total: ${totalUnpaid}`,
+      });
+    }
 
-    // 6. Update seller account arrays
-    const currentPaid = Array.isArray(sellerAccount.paid)
-      ? [...sellerAccount.paid]
-      : [];
+    // 4. Update SellerAccount arrays (paid, unpaid)
+    let newUnpaid = [...unpaidFactorIds];
+    let newPaid = sellerAccount.paid ? [...sellerAccount.paid] : [];
 
-    const currentTotal = Array.isArray(sellerAccount.total)
-      ? [...sellerAccount.total]
-      : [];
+    newUnpaid = newUnpaid.filter((id) => !fullyPaidFactorIds.includes(id));
 
-    // Add newly paid IDs to paid array (avoid duplicates)
-    processedPaidIds.forEach(id => {
-      if (!currentPaid.includes(id)) {
-        currentPaid.push(id);
-      }
-    });
+    for (const id of fullyPaidFactorIds) {
+      if (!newPaid.includes(id)) newPaid.push(id);
+    }
 
-    // Update seller account with modified arrays
+    // 5. Create Pay record
+    const payRecord = await Pay.create(
+      {
+        seller: sellerId,
+        amount: parseFloat(amount),
+        description: description || `Payment received for factors: ${fullyPaidFactorIds.join(", ")}${partiallyPaidFactors.length ? ` (partial for ${partiallyPaidFactors.join(", ")})` : ""}`,
+      },
+      { transaction }
+    );
+
+    // 6. Update SellerAccount's pays array (append the new pay record ID)
+    let currentPays = sellerAccount.pays ? [...sellerAccount.pays] : [];
+    currentPays.push(payRecord.id);
+    
     await sellerAccount.update(
       {
-        paid: currentPaid,
-        unpaid: remainingUnpaidIds,
-        // total remains unchanged
+        unpaid: newUnpaid,
+        paid: newPaid,
+        pays: currentPays,
       },
       { transaction }
     );
 
     await transaction.commit();
 
-    // Fetch updated data for response
-    const updatedSellerAccount = await SellerAccount.findOne({
-      where: { sellerId: seller },
-    });
-
-    // Fetch the updated stock incomes that were affected
-    const affectedStockIncomes = await StockIncome.findAll({
-      where: {
-        id: [...processedPaidIds, ...remainingUnpaidIds],
-      },
-    });
-
     res.status(201).json({
-      success: true,
-      message: "Payment created and applied to unpaid records successfully",
-      data: {
-        pay,
-        sellerAccount: updatedSellerAccount,
-        paymentDistribution: {
-          totalAmount: parseFloat(amount),
-          appliedAmount: parseFloat(amount) - remainingAmount,
-          remainingAmount: remainingAmount,
-          fullyPaidIds: processedPaidIds,
-          partiallyPaidIds: remainingUnpaidIds.filter(id =>
-            affectedStockIncomes.find(s => s.id === id && parseFloat(s.remaind) > 0)
-          ),
-          unpaidIds: remainingUnpaidIds,
-        },
-        affectedStockIncomes,
+      message: "Payment recorded successfully",
+      payment: {
+        id: payRecord.id,
+        sellerId,
+        amount: parseFloat(amount),
+        description: payRecord.description,
+        createdAt: payRecord.createdAt,
+      },
+      updatedFactors: {
+        fullyPaid: fullyPaidFactorIds,
+        partiallyPaid: partiallyPaidFactors,
+      },
+      sellerAccount: {
+        unpaid: newUnpaid,
+        paid: newPaid,
+        pays: currentPays,
       },
     });
-
   } catch (error) {
     await transaction.rollback();
-    console.error("Error creating payment:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error creating payment",
-      error: error.message,
-    });
+    console.error("Error recording seller payment:", error);
+    res.status(500).json({ message: "Error recording payment", error: error.message });
   }
 };
-
 
 // ==============================
 // Get All Pays (Pagination)
@@ -272,7 +191,6 @@ export const getAllPays = async (req, res) => {
   }
 };
 
-
 // ==============================
 // Get Single Pay
 // ==============================
@@ -310,7 +228,6 @@ export const getSinglePay = async (req, res) => {
     });
   }
 };
-
 
 // ==============================
 // Update Pay
@@ -350,7 +267,6 @@ export const updatePay = async (req, res) => {
   }
 };
 
-
 // ==============================
 // Delete Pay
 // ==============================
@@ -389,7 +305,6 @@ export const deletePay = async (req, res) => {
 export const getPaysByDateRange = async (req, res) => {
   const { from, to, sellerId } = req.query;
 
-  // Validate required date parameters
   if (!from || !to) {
     return res.status(400).json({
       success: false,
@@ -398,42 +313,36 @@ export const getPaysByDateRange = async (req, res) => {
   }
 
   try {
-    // Convert to full day range
     const startDate = new Date(`${from}T00:00:00`);
     const endDate = new Date(`${to}T23:59:59`);
 
-    // Build where clause for Pay
     const whereClause = {
       createdAt: {
         [Op.between]: [startDate, endDate],
       },
     };
 
-    // Add seller filter if provided
     if (sellerId) {
       whereClause.seller = sellerId;
     }
 
-    // Fetch pays with associated seller info
     const pays = await Pay.findAll({
       where: whereClause,
       include: [
         {
           model: Seller,
-          as: "sellerInfo", // Must match the alias defined in your association
+          as: "sellerInfo",
           attributes: ["id", "fullname", "phoneNumber"],
         },
       ],
       order: [["createdAt", "DESC"]],
     });
 
-    // Calculate total amount (sum of all pay amounts)
     const totalAmount = pays.reduce(
       (sum, p) => sum + parseFloat(p.amount || 0),
       0
     );
 
-    // Return response
     return res.status(200).json({
       success: true,
       message: "Pays fetched successfully",
