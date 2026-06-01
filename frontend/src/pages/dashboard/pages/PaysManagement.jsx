@@ -180,8 +180,8 @@ const PaysManagement = () => {
             <thead className="bg-cyan-800 text-white">
               <tr>
                 <th className="border px-4 py-2">#</th>
-                <th className="border px-4 py-2">شناسه فروشنده</th>
-                <th className="border px-4 py-2">مبلغ (تومان)</th>
+                <th className="border px-4 py-2">فروشنده</th>
+                <th className="border px-4 py-2">مبلغ (افغانی)</th>
                 <th className="border px-4 py-2">توضیحات</th>
                 <th className="border px-4 py-2">تاریخ ثبت</th>
                 <th className="border px-4 py-2">عملیات</th>
@@ -200,10 +200,10 @@ const PaysManagement = () => {
                 pays.map((pay, idx) => (
                   <tr key={pay.id} className="hover:bg-gray-50">
                     <td className="border px-4 py-2">{idx + 1 + (currentPage - 1) * limit}</td>
-                    <td className="border px-4 py-2">{pay.seller}</td>
-                    <td className="border px-4 py-2 font-bold text-green-700">{formatNumber(pay.amount)}</td>
+                    <td className="border px-4 py-2">{pay.sellerInfo.fullname}</td>
+                    <td className="border px-4 py-2 font-bold text-green-700">{pay.amount}</td>
                     <td className="border px-4 py-2 max-w-xs truncate">{pay.description || "—"}</td>
-                    <td className="border px-4 py-2">{new Date(pay.createdAt).toLocaleDateString("fa-IR")}</td>
+                    <td className="border px-4 py-2">{new Date(pay.createdAt).toLocaleDateString("eng-en")}</td>
                     <td className="border px-4 py-2">
                       <div className="flex justify-center gap-2">
                         <button
@@ -213,13 +213,13 @@ const PaysManagement = () => {
                         >
                           <FaEdit />
                         </button>
-                        <button
+                        {/* <button
                           onClick={() => handleDelete(pay.id, pay.seller)}
                           className="text-red-600 hover:text-red-700"
                           title="حذف"
                         >
                           <FaTrash />
-                        </button>
+                        </button> */}
                       </div>
                     </td>
                   </tr>
@@ -229,14 +229,11 @@ const PaysManagement = () => {
           </table>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
           />
-        )}
       </div>
 
       {/* Add/Edit Modal */}

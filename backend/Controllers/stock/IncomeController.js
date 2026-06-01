@@ -77,12 +77,11 @@ export const createPayRecord = async ({ sellerId, amount, description = "", tran
 
   try {
     const payRecord = await Pay.create({
-      seller: sellerId,            // field name is 'seller', not 'sellerId'
+      seller: sellerId,
       amount: parseFloat(amount),
       description: description || `Payment to seller ID ${sellerId}`,
     }, { transaction });
-
-    return payRecord;
+    return payRecord;  // ✅ return the full record (including id)
   } catch (error) {
     console.error("Error creating pay record:", error);
     throw error;
@@ -164,16 +163,19 @@ export const batchCreateIncomes = async (req, res) => {
       incomes: incomesSummary,
       notes: `Batch created on ${new Date().toISOString()}. Upfront payment: ${upfrontPaid}`,
     }, { transaction });
+
+    let payRecordId = null;
     if (upfrontPaid > 0) {
-      await createPayRecord({
+      const payRecord = await createPayRecord({
         sellerId: sellerRecord.id,
         amount: upfrontPaid,
         description: `Upfront payment for factor ${factor.factorNumber} (ID: ${factor.id})`,
         transaction,
       });
+      payRecordId = payRecord.id;  // store the id for later use
     }
 
-    // Update SellerAccount
+    // Update SellerAccount (including pays array)
     let sellerAccount = await SellerAccount.findOne({
       where: { sellerId: sellerRecord.id },
       lock: transaction.LOCK.UPDATE,
@@ -184,17 +186,20 @@ export const batchCreateIncomes = async (req, res) => {
       const totalArray = [factor.id];
       const paidArray = status === 'paid' ? [factor.id] : [];
       const unpaidArray = (status === 'partial' || status === 'unpaid') ? [factor.id] : [];
+      const paysArray = payRecordId ? [payRecordId] : [];
 
       sellerAccount = await SellerAccount.create({
         sellerId: sellerRecord.id,
         total: totalArray,
         paid: paidArray,
         unpaid: unpaidArray,
+        pays: paysArray,           // ✅ store the pay record id in the pays array
       }, { transaction });
     } else {
       let newTotal = Array.isArray(sellerAccount.total) ? [...sellerAccount.total] : [];
       let newPaid = Array.isArray(sellerAccount.paid) ? [...sellerAccount.paid] : [];
       let newUnpaid = Array.isArray(sellerAccount.unpaid) ? [...sellerAccount.unpaid] : [];
+      let newPays = Array.isArray(sellerAccount.pays) ? [...sellerAccount.pays] : [];
 
       if (!newTotal.includes(factor.id)) {
         newTotal.push(factor.id);
@@ -208,17 +213,21 @@ export const batchCreateIncomes = async (req, res) => {
         newPaid = newPaid.filter(id => id !== factor.id);
       }
 
+      // Add the pay record id if present and not already in the array
+      if (payRecordId && !newPays.includes(payRecordId)) {
+        newPays.push(payRecordId);
+      }
+
       await sellerAccount.update({
         total: newTotal,
         paid: newPaid,
         unpaid: newUnpaid,
+        pays: newPays,             // ✅ update pays array
       }, { transaction });
     }
 
-    // ✅ COMMIT THE TRANSACTION (CRITICAL FIX)
     await transaction.commit();
 
-    // Fetch incomes with seller details for response
     const incomesWithSeller = await Income.findAll({
       where: { id: createdIncomes.map(i => i.id) },
       include: [{ model: Seller, as: 'seller' }],

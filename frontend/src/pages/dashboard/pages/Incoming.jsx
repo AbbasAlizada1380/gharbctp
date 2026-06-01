@@ -6,7 +6,7 @@ import Pagination from "../pagination/Pagination";
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const INCOME_API_URL = `${BASE_URL}/stock/income`;
 
-// Function to create empty items
+// Helper: create a specified number of empty income items
 const createEmptyItems = (count = 5) => {
   return Array.from({ length: count }, () => ({
     size: "",
@@ -18,26 +18,30 @@ const createEmptyItems = (count = 5) => {
 };
 
 const Incoming = () => {
+  // Form state
   const [items, setItems] = useState(createEmptyItems(5));
-  const [incomes, setIncomes] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [perPage, setPerPage] = useState(10);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Seller related states
+  // Seller state
   const [sellers, setSellers] = useState([]);
-  const [sellerMode, setSellerMode] = useState("existing");
+  const [sellerMode, setSellerMode] = useState("existing"); // "existing" or "new"
   const [sellerId, setSellerId] = useState("");
   const [newSeller, setNewSeller] = useState("");
 
-  // Payment field (new)
+  // Payment field – upfront payment for the factor (only for batch creation)
   const [paidAmount, setPaidAmount] = useState("");
 
-  // Fetch sellers
+  // Incomes list (table)
+  const [incomes, setIncomes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [perPage, setPerPage] = useState(10);
+
+  // ---------- API calls ----------
   const fetchSellers = async () => {
     try {
       const response = await axios.get(`${BASE_URL}/seller/active`);
@@ -47,7 +51,6 @@ const Incoming = () => {
     }
   };
 
-  // Fetch all incomes
   const fetchIncomes = async (page = 1) => {
     try {
       setLoading(true);
@@ -64,11 +67,7 @@ const Incoming = () => {
     }
   };
 
-  const handlePageChange = (page) => {
-    fetchIncomes(page);
-  };
-
-  // Fetch single income for edit (unchanged)
+  // Fetch single income for editing (populates form with one item)
   const fetchIncomeById = async (id) => {
     try {
       setLoading(true);
@@ -83,8 +82,9 @@ const Incoming = () => {
       }]);
       setEditingId(id);
       setHasUnsavedChanges(false);
-      setPaidAmount(""); // reset paid amount on edit (or you could fetch factor's paid amount)
+      setPaidAmount(""); // editing a single income does not affect factor's upfront payment
 
+      // Restore seller info
       if (income.seller) {
         if (income.seller.id) {
           setSellerMode("existing");
@@ -101,41 +101,12 @@ const Incoming = () => {
         setNewSeller("");
       }
 
-      document.getElementById('income-form').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById("income-form").scrollIntoView({ behavior: "smooth" });
     } catch (error) {
       console.error("Error fetching income:", error);
       alert("خطا در دریافت اطلاعات درآمد");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const BATCH_API_URL = `${INCOME_API_URL}/batch`;
-
-  const batchCreateIncomes = async (seller, incomesArray, paidAmountValue) => {
-    try {
-      const response = await axios.post(BATCH_API_URL, {
-        seller,
-        incomes: incomesArray,
-        paidAmount: paidAmountValue    // ✅ send paidAmount to backend
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error batch creating incomes:", error.response?.data || error.message);
-      alert(error.response?.data?.message || "خطا در ثبت درآمدها");
-      throw error;
-    }
-  };
-
-  // Update single income (unchanged)
-  const updateIncome = async (id, incomeData) => {
-    try {
-      const response = await axios.put(`${INCOME_API_URL}/${id}`, incomeData);
-      return response.data;
-    } catch (error) {
-      console.error("Error updating income:", error.response?.data || error.message);
-      alert(error.response?.data?.message || "خطا در بروزرسانی درآمد");
-      throw error;
     }
   };
 
@@ -151,10 +122,27 @@ const Incoming = () => {
     }
   };
 
+  // Batch create (multiple incomes)
+  const batchCreateIncomes = async (seller, incomesArray, paidAmountValue) => {
+    const response = await axios.post(`${INCOME_API_URL}/batch`, {
+      seller,
+      incomes: incomesArray,
+      paidAmount: paidAmountValue
+    });
+    return response.data;
+  };
+
+  // Update single income (assumes backend PUT endpoint exists)
+  const updateIncome = async (id, incomeData) => {
+    const response = await axios.put(`${INCOME_API_URL}/${id}`, incomeData);
+    return response.data;
+  };
+
+  // ---------- Form helpers ----------
   const calculateMoney = (quantity, price) => {
-    const qnty = parseFloat(quantity) || 0;
+    const qty = parseFloat(quantity) || 0;
     const prc = parseFloat(price) || 0;
-    return (qnty * prc).toFixed(2);
+    return (qty * prc).toFixed(2);
   };
 
   const handleChange = (index, e) => {
@@ -163,8 +151,7 @@ const Incoming = () => {
     updatedItems[index][name] = value;
 
     if (name === "quantity" || name === "price") {
-      const money = calculateMoney(updatedItems[index].quantity, updatedItems[index].price);
-      updatedItems[index].money = money;
+      updatedItems[index].money = calculateMoney(updatedItems[index].quantity, updatedItems[index].price);
     }
 
     setItems(updatedItems);
@@ -178,77 +165,77 @@ const Incoming = () => {
 
   const removeItem = (index) => {
     if (items.length <= 5) {
-      alert("حداقل باید ۵ مورد موجود باشد");
+      alert("حداقل باید ۵ مورد وجود داشته باشد");
       return;
     }
-    const updatedItems = items.filter((_, i) => i !== index);
-    setItems(updatedItems);
+    const updated = items.filter((_, i) => i !== index);
+    setItems(updated);
     setHasUnsavedChanges(true);
   };
 
   const resetForm = () => {
-    if (hasUnsavedChanges && !window.confirm("آیا از لغو تغییرات اطمینان دارید؟ تغییرات ذخیره نشده از بین خواهند رفت.")) return;
     setItems(createEmptyItems(5));
     setEditingId(null);
     setSellerMode("existing");
     setSellerId("");
     setNewSeller("");
-    setPaidAmount("");          // clear paid amount on reset
+    setPaidAmount("");
     setHasUnsavedChanges(false);
   };
 
+  const handlePageChange = (page) => {
+    fetchIncomes(page);
+  };
+  // ---------- Submit handler ----------
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate seller
+    // Seller validation
     if (sellerMode === "existing" && !sellerId) {
-      alert("لطفا فروشنده را انتخاب کنید");
+      alert("لطفاً فروشنده را انتخاب کنید");
       return;
     }
     if (sellerMode === "new" && !newSeller.trim()) {
-      alert("لطفا نام فروشنده جدید را وارد کنید");
+      alert("لطفاً نام فروشنده جدید را وارد کنید");
       return;
     }
 
-    // Filter out completely empty items
+    // Filter out completely empty rows
     const nonEmptyItems = items.filter(item =>
       item.size.trim() !== "" || item.quantity !== "" || item.price !== ""
     );
-
     if (nonEmptyItems.length === 0) {
-      alert("لطفا حداقل یک مورد را پر کنید");
+      alert("حداقل یک مورد را پر کنید");
       return;
     }
 
-    // Validate filled items
-    const validationErrors = [];
-    nonEmptyItems.forEach((item, index) => {
-      if (!item.size) validationErrors.push(`سطر ${index + 1}: اندازه را انتخاب کنید`);
-      if (!item.quantity || parseFloat(item.quantity) <= 0) validationErrors.push(`سطر ${index + 1}: تعداد معتبر وارد کنید`);
-      if (!item.price || parseFloat(item.price) <= 0) validationErrors.push(`سطر ${index + 1}: قیمت معتبر وارد کنید`);
+    // Validate each filled row
+    const errors = [];
+    nonEmptyItems.forEach((item, idx) => {
+      if (!item.size) errors.push(`سطر ${idx + 1}: اندازه را انتخاب کنید`);
+      if (!item.quantity || parseFloat(item.quantity) <= 0) errors.push(`سطر ${idx + 1}: تعداد معتبر وارد کنید`);
+      if (!item.price || parseFloat(item.price) <= 0) errors.push(`سطر ${idx + 1}: قیمت معتبر وارد کنید`);
     });
-
-    if (validationErrors.length > 0) {
-      alert(validationErrors.join("\n"));
+    if (errors.length) {
+      alert(errors.join("\n"));
       return;
     }
 
-    // Validate paidAmount (if provided, must be a non-negative number)
+    // Validate paidAmount (only for batch creation, not for editing)
     const paidAmountValue = paidAmount === "" ? 0 : parseFloat(paidAmount);
-    if (isNaN(paidAmountValue) || paidAmountValue < 0) {
+    if (!editingId && (isNaN(paidAmountValue) || paidAmountValue < 0)) {
       alert("مبلغ پرداختی باید عددی مثبت یا صفر باشد");
       return;
     }
 
-    setLoading(true);
-
+    setSubmitting(true);
     try {
       const seller = sellerMode === "existing"
         ? { id: parseInt(sellerId) }
         : { name: newSeller.trim() };
 
       if (editingId) {
-        // Update single income (as before) – paidAmount not used for single update
+        // Single update – paidAmount is ignored (factors are not updated here)
         await updateIncome(editingId, {
           seller,
           size: nonEmptyItems[0].size,
@@ -258,7 +245,7 @@ const Incoming = () => {
         });
         alert("درآمد با موفقیت بروزرسانی شد");
       } else {
-        // ** BATCH CREATE with paidAmount **
+        // Batch create with upfront payment
         const incomesForBatch = nonEmptyItems.map(item => ({
           size: item.size,
           quantity: parseFloat(item.quantity),
@@ -266,32 +253,29 @@ const Incoming = () => {
           spent: parseFloat(item.spent) || 0
         }));
         await batchCreateIncomes(seller, incomesForBatch, paidAmountValue);
-        alert(`${incomesForBatch.length} مورد با موفقیت ثبت شد`);
+        alert(`${incomesForBatch.length} مورد درآمد با موفقیت ثبت شد`);
       }
 
-      // Reset form
-      setItems(createEmptyItems(5));
-      setEditingId(null);
-      setSellerMode("existing");
-      setSellerId("");
-      setNewSeller("");
-      setPaidAmount("");
-      setHasUnsavedChanges(false);
+      // Reset form and refresh list
+      resetForm();
       fetchIncomes(currentPage);
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Submit error:", error);
+      alert(error.response?.data?.message || "خطا در ثبت اطلاعات");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
+  // ---------- Effects ----------
   useEffect(() => {
     fetchIncomes();
     fetchSellers();
   }, []);
 
+  // ---------- Render helpers ----------
   const formatDate = (dateString) => {
-    return new Intl.DateTimeFormat("fa-IR-u-ca-persian-nu-latn", {
+    return new Intl.DateTimeFormat("eng-en-u-ca-persian-nu-latn", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -308,20 +292,22 @@ const Incoming = () => {
 
       {/* Form Section */}
       <div id="income-form" className="mb-8 bg-white p-6 rounded-xl shadow-md">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Seller Selection */}
-          <div className="border-b border-gray-200 pb-4 mb-4">
-            <h3 className="text-lg font-medium text-gray-800 mb-3">اطلاعات فروشنده</h3>
-            <div className="flex flex-wrap gap-4 mb-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Seller Information */}
+          <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-300">
+              اطلاعات فروشنده
+            </h3>
+            <div className="flex flex-wrap gap-6 mb-5">
               <label className="inline-flex items-center">
                 <input
                   type="radio"
                   value="existing"
                   checked={sellerMode === "existing"}
                   onChange={() => setSellerMode("existing")}
-                  className="h-4 w-4 text-cyan-600"
+                  className="h-4 w-4 text-cyan-600 focus:ring-cyan-500"
                 />
-                <span className="mr-2 text-sm text-gray-700">فروشنده موجود</span>
+                <span className="mr-2 text-sm font-medium text-gray-700">فروشنده موجود</span>
               </label>
               <label className="inline-flex items-center">
                 <input
@@ -329,20 +315,20 @@ const Incoming = () => {
                   value="new"
                   checked={sellerMode === "new"}
                   onChange={() => setSellerMode("new")}
-                  className="h-4 w-4 text-cyan-600"
+                  className="h-4 w-4 text-cyan-600 focus:ring-cyan-500"
                 />
-                <span className="mr-2 text-sm text-gray-700">فروشنده جدید</span>
+                <span className="mr-2 text-sm font-medium text-gray-700">فروشنده جدید</span>
               </label>
             </div>
 
             {sellerMode === "existing" && (
               <div className="max-w-md">
-                <label className="block text-sm font-medium text-gray-700 mb-1">انتخاب فروشنده *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">انتخاب فروشنده *</label>
                 <select
                   value={sellerId}
                   onChange={(e) => setSellerId(e.target.value)}
                   required
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm"
+                  className="block w-full rounded-md border-2 border-gray-300 bg-white shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 sm:text-sm p-2"
                 >
                   <option value="">انتخاب فروشنده</option>
                   {sellers.map((s) => (
@@ -356,128 +342,133 @@ const Incoming = () => {
 
             {sellerMode === "new" && (
               <div className="max-w-md">
-                <label className="block text-sm font-medium text-gray-700 mb-1">نام فروشنده جدید *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">نام فروشنده جدید *</label>
                 <input
                   type="text"
                   placeholder="مثال: علی محمدی"
                   value={newSeller}
                   onChange={(e) => setNewSeller(e.target.value)}
                   required
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm"
+                  className="block w-full rounded-md border-2 border-gray-300 bg-white shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 sm:text-sm p-2"
                 />
               </div>
             )}
           </div>
 
-          {/* ✅ New: Payment field – upfront payment for the factor */}
-          <div className="border-b border-gray-200 pb-4 mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              مبلغ پرداختی (پیش‌پرداخت) – اختیاری
-            </label>
-            <div className="max-w-md">
-              <input
-                type="number"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                placeholder="0 (افغانی)"
-                min="0"
-                step="0.01"
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                این مبلغ به عنوان پرداخت اولیه در فاکتور ثبت می‌شود.
-              </p>
-            </div>
+          {/* Items List */}
+          <div className="space-y-4">
+            {items.map((item, index) => {
+              const isEmpty = !item.size && !item.quantity && !item.price;
+              return (
+                <div
+                  key={index}
+                  className={`grid grid-cols-1 md:grid-cols-6 gap-4 items-end p-4 rounded-lg border ${isEmpty ? "bg-blue-50 border-blue-200" : "bg-white border-gray-200"
+                    } shadow-sm`}
+                >
+                  <div className="md:col-span-2">
+                    <label className="block mb-1 text-sm font-semibold text-gray-700">اندازه</label>
+                    <select
+                      name="size"
+                      value={item.size}
+                      onChange={(e) => handleChange(index, e)}
+                      className={`w-full rounded-md border-2 ${isEmpty ? "border-blue-300" : "border-gray-300"} bg-white p-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500`}
+                    >
+                      <option value="">انتخاب اندازه</option>
+                      {sizes.map((s) => (
+                        <option key={s.id} value={s.label}>{s.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-semibold text-gray-700">تعداد (پلیت)</label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      value={item.quantity}
+                      onChange={(e) => handleChange(index, e)}
+                      className={`w-full rounded-md border-2 ${isEmpty ? "border-blue-300" : "border-gray-300"} bg-white p-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500`}
+                      placeholder="۰"
+                      min="0"
+                      step="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-semibold text-gray-700">قیمت پلیت (افغانی)</label>
+                    <input
+                      type="number"
+                      name="price"
+                      value={item.price}
+                      onChange={(e) => handleChange(index, e)}
+                      className={`w-full rounded-md border-2 ${isEmpty ? "border-blue-300" : "border-gray-300"} bg-white p-2 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500`}
+                      placeholder="۰"
+                      min="0"
+                      step="0.001"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-sm font-semibold text-gray-700">مبلغ کل</label>
+                    <input
+                      type="text"
+                      name="money"
+                      value={item.money}
+                      readOnly
+                      className="w-full rounded-md border-2 border-gray-200 bg-gray-100 p-2 text-gray-700"
+                    />
+                  </div>
+                  {items.length > 5 && !editingId && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(index)}
+                        className="w-full px-3 py-2 bg-red-100 text-red-700 font-medium rounded-md hover:bg-red-200 transition border border-red-200"
+                      >
+                        حذف
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Items List */}
-          {items.map((item, index) => {
-            const isEmpty = !item.size && !item.quantity && !item.price;
-            return (
-              <div
-                key={index}
-                className={`grid grid-cols-1 md:grid-cols-6 gap-4 items-end border-b border-gray-200 pb-4 mb-4 ${isEmpty ? 'bg-gray-50 p-4 rounded-md border-dashed' : ''}`}
-              >
-                <div className="md:col-span-2">
-                  <label className="block mb-1 text-sm font-medium">اندازه</label>
-                  <select
-                    name="size"
-                    value={item.size}
-                    onChange={(e) => handleChange(index, e)}
-                    className={`w-full border rounded-md p-2 focus:ring-2 focus:ring-cyan-300 ${isEmpty ? 'border-dashed' : ''}`}
-                  >
-                    <option value="">انتخاب اندازه</option>
-                    {sizes.map((s) => (
-                      <option key={s.id} value={s.label}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block mb-1 text-sm font-medium">تعداد (پلیت)</label>
-                  <input
-                    type="number"
-                    name="quantity"
-                    value={item.quantity}
-                    onChange={(e) => handleChange(index, e)}
-                    className={`w-full border rounded-md p-2 focus:ring-2 focus:ring-cyan-300 ${isEmpty ? 'border-dashed' : ''}`}
-                    placeholder="0"
-                    min="0"
-                    step="1"
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1 text-sm font-medium">قیمت پلیت (افغانی)</label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={item.price}
-                    onChange={(e) => handleChange(index, e)}
-                    className={`w-full border rounded-md p-2 focus:ring-2 focus:ring-cyan-300 ${isEmpty ? 'border-dashed' : ''}`}
-                    placeholder="0"
-                    min="0"
-                    step="0.001"
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1 text-sm font-medium">مبلغ کل</label>
-                  <input
-                    type="text"
-                    name="money"
-                    value={item.money}
-                    readOnly
-                    className="w-full border border-gray-300 bg-gray-50 rounded-md p-2"
-                  />
-                </div>
-                {items.length > 5 && !editingId && (
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(index)}
-                      className="w-full px-3 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition"
-                    >
-                      حذف
-                    </button>
-                  </div>
-                )}
+          {/* Upfront Payment (only for batch creation) */}
+          {!editingId && (
+            <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                مبلغ پرداختی (پیش‌پرداخت) – اختیاری
+              </label>
+              <div className="max-w-md">
+                <input
+                  type="number"
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                  placeholder="۰ (افغانی)"
+                  min="0"
+                  step="0.01"
+                  className="block w-full rounded-md border-2 border-gray-300 bg-white shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 sm:text-sm p-2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  این مبلغ به عنوان پرداخت اولیه در فاکتور ثبت می‌شود.
+                </p>
               </div>
-            );
-          })}
+            </div>
+          )}
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-200">
+          {/* Buttons */}
+          <div className="flex flex-wrap gap-4 pt-4 border-t-2 border-gray-200 mt-6">
             {!editingId && (
               <>
                 <button
                   type="button"
                   onClick={addItem}
-                  className="bg-cyan-600 text-white px-4 py-2 rounded-md hover:bg-cyan-700 transition"
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-5 py-2 rounded-md transition shadow-sm"
                 >
                   + مورد جدید (مجموع: {items.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setItems(createEmptyItems(5))}
-                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition"
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-5 py-2 rounded-md transition disabled:opacity-50"
                   disabled={items.length === 5 && !hasUnsavedChanges}
                 >
                   بازنشانی به ۵ مورد خالی
@@ -486,18 +477,23 @@ const Incoming = () => {
             )}
             <button
               type="submit"
-              disabled={loading || filledItemsCount === 0}
-              className="flex-1 bg-cyan-800 text-white py-3 rounded-md hover:bg-cyan-900 transition disabled:opacity-50"
+              disabled={submitting || filledItemsCount === 0}
+              className={`flex-1 py-3 rounded-md font-bold text-white transition shadow-md ${submitting || filledItemsCount === 0
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-cyan-800 hover:bg-cyan-900"
+                }`}
             >
-              {loading ? "در حال پردازش..." :
-                editingId ? "بروزرسانی درآمد" :
-                  `ثبت ${filledItemsCount} مورد درآمد`}
+              {submitting
+                ? "در حال پردازش..."
+                : editingId
+                  ? "بروزرسانی درآمد"
+                  : `ثبت ${filledItemsCount} مورد درآمد`}
             </button>
             {(editingId || hasUnsavedChanges) && (
               <button
                 type="button"
                 onClick={resetForm}
-                className="bg-gray-400 text-white px-4 py-3 rounded-md hover:bg-gray-500 transition"
+                className="bg-gray-500 hover:bg-gray-600 text-white font-semibold px-6 py-3 rounded-md transition shadow-sm"
               >
                 {editingId ? "انصراف ویرایش" : "لغو تغییرات"}
               </button>
@@ -506,7 +502,7 @@ const Incoming = () => {
         </form>
       </div>
 
-      {/* Incomes List (unchanged) */}
+      {/* Incomes Table */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center">
           <h3 className="text-lg font-bold text-cyan-800">لیست درآمدها ({totalItems} مورد)</h3>
@@ -532,7 +528,6 @@ const Incoming = () => {
                     <th className="p-3 border-b">مصرف شده</th>
                     <th className="p-3 border-b">موجودی</th>
                     <th className="p-3 border-b">تاریخ</th>
-                    <th className="p-3 border-b">عملیات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -544,29 +539,15 @@ const Incoming = () => {
                         <td className="p-3">{income.seller?.fullname || income.seller?.name || "—"}</td>
                         <td className="p-3"><span className="bg-gray-100 px-2 py-1 rounded text-sm">{income.size}</span></td>
                         <td className="p-3"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm">{income.quantity}</span></td>
-                        <td className="p-3 text-green-700">{parseFloat(income.price || 0).toLocaleString('en-US')}</td>
-                        <td className="p-3 text-purple-700 font-bold">{parseFloat(income.money || 0).toLocaleString('en-US')}</td>
+                        <td className="p-3 text-green-700">{parseFloat(income.price || 0).toLocaleString("en-US")}</td>
+                        <td className="p-3 text-purple-700 font-bold">{parseFloat(income.money || 0).toLocaleString("en-US")}</td>
                         <td className="p-3"><span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-sm">{income.spent || 0}</span></td>
                         <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-sm ${remaining > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                          <span className={`px-2 py-1 rounded-full text-sm ${remaining > 0 ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
                             {remaining > 0 ? remaining : 0}
                           </span>
                         </td>
                         <td className="p-3 text-gray-500 text-sm">{formatDate(income.createdAt)}</td>
-                        <td className="p-3">
-                          <button
-                            onClick={() => fetchIncomeById(income.id)}
-                            className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600 ml-2"
-                          >
-                            ویرایش
-                          </button>
-                          <button
-                            onClick={() => deleteIncome(income.id)}
-                            className="bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600"
-                          >
-                            حذف
-                          </button>
-                        </td>
                       </tr>
                     );
                   })}
