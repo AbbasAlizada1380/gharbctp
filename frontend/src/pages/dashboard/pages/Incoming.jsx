@@ -275,7 +275,7 @@ const Incoming = () => {
 
   // ---------- Render helpers ----------
   const formatDate = (dateString) => {
-    return new Intl.DateTimeFormat("eng-en-u-ca-persian-nu-latn", {
+    return new Intl.DateTimeFormat("eng-en", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
