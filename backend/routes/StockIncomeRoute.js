@@ -6,13 +6,17 @@ import {
   updateIncome,
   updateIncomeProperties,
   deleteIncome,
-  batchCreateIncomes,          // ✅ import the batch function
+  batchCreateIncomes,
+  getIncomesByFactorId
 } from "../Controllers/stock/IncomeController.js";
 
 const IncomeRoute = express.Router();
 
-// ✅ Batch creation – must come before the root POST
 IncomeRoute.post("/batch", batchCreateIncomes);
+
+// 🆕 Route to get all incomes for a specific factor
+// Example: GET /api/incomes/by-factor/123?page=1&limit=20
+IncomeRoute.get("/by-factor/:factorId", getIncomesByFactorId);
 
 // Single income routes
 IncomeRoute.patch("/:id", updateIncomeProperties);

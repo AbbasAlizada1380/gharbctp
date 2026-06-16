@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import sizes from "../services/Size.js";
 import Pagination from "../pagination/Pagination";
+import Factors from "./Factors.jsx";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const INCOME_API_URL = `${BASE_URL}/stock/income`;
@@ -21,6 +22,7 @@ const Incoming = () => {
   // Form state
   const [items, setItems] = useState(createEmptyItems(5));
   const [editingId, setEditingId] = useState(null);
+  const [activeTab, setActiveTab] = useState("incomes");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -502,8 +504,28 @@ const Incoming = () => {
         </form>
       </div>
 
+      <div className="flex justify-center mb-4">
+        <button
+          className={`px-6 py-2 rounded-l-lg font-semibold ${activeTab === "incomes"
+            ? "bg-blue-600 text-white"
+            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          onClick={() => setActiveTab("incomes")}
+        >
+          درآمدها
+        </button>
+        <button
+          className={`px-6 py-2 rounded-r-lg font-semibold ${activeTab === "factors"
+            ? "bg-blue-600 text-white"
+            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          onClick={() => setActiveTab("factors")}
+        >
+          فاکتورها
+        </button>
+      </div>
       {/* Incomes Table */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      {activeTab === "incomes" ? (<div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center">
           <h3 className="text-lg font-bold text-cyan-800">لیست درآمدها ({totalItems} مورد)</h3>
           <span className="text-sm text-gray-600">صفحه {currentPage} از {totalPages}</span>
@@ -559,7 +581,9 @@ const Incoming = () => {
             </div>
           </>
         )}
-      </div>
+      </div>) : (
+        <Factors />
+      )}
     </div>
   );
 };

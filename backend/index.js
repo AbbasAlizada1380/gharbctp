@@ -24,6 +24,7 @@ import PalletRoute from "./routes/PalletRoute.js";
 import SellerRoute from "./routes/Seller/SellerRoute.js";
 import SellerAccountRoute from "./routes/Seller/SellerAccountRoute.js";
 import PayRoute from "./routes/finance/PayRoute.js";
+import FactorRouter from "./routes/finance/FactorRouter.js";
 const FRONT_URL = process.env.FRONT_URL
 const port = 8038;
 const app = express();
@@ -94,6 +95,7 @@ app.use("/palletmoney", PalletRoute);
 app.use("/seller", SellerRoute);
 app.use("/seller_accounts", SellerAccountRoute);
 app.use("/pays", PayRoute);
+app.use("/factors", FactorRouter);
 
 
 app.use("/employees", employeeRoutes);

@@ -103,6 +103,7 @@ export const batchCreateIncomes = async (req, res) => {
     let totalMoney = 0;
     let totalSpent = 0;
 
+    // 1️⃣ Create incomes (without factorId yet)
     for (const item of incomes) {
       const { size, quantity, price, spent = 0 } = item;
 
@@ -124,19 +125,24 @@ export const batchCreateIncomes = async (req, res) => {
       totalMoney += money;
       totalSpent += spentVal;
 
-      const income = await Income.create({
-        size,
-        quantity: qty.toString(),
-        price: prc.toString(),
-        money: money.toString(),
-        spent: spentVal.toString(),
-        sellerId: sellerRecord.id,
-      }, { transaction });
+      const income = await Income.create(
+        {
+          size,
+          quantity: qty.toString(),
+          price: prc.toString(),
+          money: money.toString(),
+          spent: spentVal.toString(),
+          sellerId: sellerRecord.id,
+          // factorId will be set later
+        },
+        { transaction }
+      );
 
       await updateExistTable(size, qty, 'add', transaction);
       createdIncomes.push(income);
     }
 
+    // 2️⃣ Calculate totals and create Factor
     const upfrontPaid = parseFloat(paidAmount) || 0;
     if (upfrontPaid < 0) {
       await transaction.rollback();
@@ -153,17 +159,27 @@ export const batchCreateIncomes = async (req, res) => {
     const factorNumber = `FACT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const incomesSummary = createdIncomes.map(inc => inc.id);
 
-    const factor = await Factor.create({
-      factorNumber,
-      sellerId: sellerRecord.id,
-      totalAmount: totalMoney,
-      paidAmount: totalPaid,
-      remainingAmount: remaining,
-      status,
-      incomes: incomesSummary,
-      notes: `Batch created on ${new Date().toISOString()}. Upfront payment: ${upfrontPaid}`,
-    }, { transaction });
+    const factor = await Factor.create(
+      {
+        factorNumber,
+        sellerId: sellerRecord.id,
+        totalAmount: totalMoney,
+        paidAmount: totalPaid,
+        remainingAmount: remaining,
+        status,
+        incomes: incomesSummary,
+        notes: `Batch created on ${new Date().toISOString()}. Upfront payment: ${upfrontPaid}`,
+      },
+      { transaction }
+    );
 
+    // 3️⃣ 🆕 Update all created incomes with the factorId
+    await Income.update(
+      { factorId: factor.id },
+      { where: { id: createdIncomes.map(i => i.id) }, transaction }
+    );
+
+    // 4️⃣ Create Pay record if upfrontPaid > 0
     let payRecordId = null;
     if (upfrontPaid > 0) {
       const payRecord = await createPayRecord({
@@ -172,10 +188,10 @@ export const batchCreateIncomes = async (req, res) => {
         description: `Upfront payment for factor ${factor.factorNumber} (ID: ${factor.id})`,
         transaction,
       });
-      payRecordId = payRecord.id;  // store the id for later use
+      payRecordId = payRecord.id;
     }
 
-    // Update SellerAccount (including pays array)
+    // 5️⃣ Update SellerAccount (including pays array)
     let sellerAccount = await SellerAccount.findOne({
       where: { sellerId: sellerRecord.id },
       lock: transaction.LOCK.UPDATE,
@@ -193,7 +209,7 @@ export const batchCreateIncomes = async (req, res) => {
         total: totalArray,
         paid: paidArray,
         unpaid: unpaidArray,
-        pays: paysArray,           // ✅ store the pay record id in the pays array
+        pays: paysArray,
       }, { transaction });
     } else {
       let newTotal = Array.isArray(sellerAccount.total) ? [...sellerAccount.total] : [];
@@ -201,9 +217,7 @@ export const batchCreateIncomes = async (req, res) => {
       let newUnpaid = Array.isArray(sellerAccount.unpaid) ? [...sellerAccount.unpaid] : [];
       let newPays = Array.isArray(sellerAccount.pays) ? [...sellerAccount.pays] : [];
 
-      if (!newTotal.includes(factor.id)) {
-        newTotal.push(factor.id);
-      }
+      if (!newTotal.includes(factor.id)) newTotal.push(factor.id);
 
       if (status === 'paid') {
         if (!newPaid.includes(factor.id)) newPaid.push(factor.id);
@@ -213,7 +227,6 @@ export const batchCreateIncomes = async (req, res) => {
         newPaid = newPaid.filter(id => id !== factor.id);
       }
 
-      // Add the pay record id if present and not already in the array
       if (payRecordId && !newPays.includes(payRecordId)) {
         newPays.push(payRecordId);
       }
@@ -222,12 +235,13 @@ export const batchCreateIncomes = async (req, res) => {
         total: newTotal,
         paid: newPaid,
         unpaid: newUnpaid,
-        pays: newPays,             // ✅ update pays array
+        pays: newPays,
       }, { transaction });
     }
 
     await transaction.commit();
 
+    // 6️⃣ Fetch final incomes with seller relation
     const incomesWithSeller = await Income.findAll({
       where: { id: createdIncomes.map(i => i.id) },
       include: [{ model: Seller, as: 'seller' }],
@@ -469,4 +483,75 @@ export const updateIncomeProperties = async (req, res) => {
   // Similar adjustments – add seller handling if needed
   // For brevity, I'll keep your existing logic but ensure transaction and stock updates are correct.
   // (You can extend it yourself following the pattern above)
+};
+
+/* ===============================
+   GET INCOMES BY FACTOR ID
+================================ */
+export const getIncomesByFactorId = async (req, res) => {
+  try {
+    const { factorId } = req.params;
+
+    // Optional: check if factor exists first
+    const factor = await Factor.findByPk(factorId);
+    if (!factor) {
+      return res.status(404).json({
+        success: false,
+        message: "Factor not found",
+      });
+    }
+
+    // Pagination (optional)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50; // default 50 items per page
+    const offset = (page - 1) * limit;
+
+    const { count, rows: incomes } = await Income.findAndCountAll({
+      where: { factorId },
+      include: [
+        {
+          model: Seller,
+          as: "seller",
+          attributes: ["id", "fullname", "phoneNumber"],
+        },
+        // Optionally include the Exist/Stock association if needed
+        // {
+        //   model: Exist,
+        //   as: "stock",
+        //   attributes: ["id", "name", "departmentId"],
+        // },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit,
+      offset,
+    });
+
+    const totalPages = Math.ceil(count / limit);
+
+    res.json({
+      success: true,
+      factor: {
+        id: factor.id,
+        factorNumber: factor.factorNumber,
+        totalAmount: factor.totalAmount,
+        status: factor.status,
+      },
+      incomes,
+      pagination: {
+        totalItems: count,
+        totalPages,
+        currentPage: page,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
+  } catch (error) {
+    console.error("Error in getIncomesByFactorId:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch incomes for this factor",
+      error: error.message,
+    });
+  }
 };

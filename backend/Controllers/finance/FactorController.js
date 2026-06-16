@@ -1,7 +1,7 @@
 import sequelize from "../../dbconnection.js";
 import Factor from "../../Models/Finance/Factor.js";
 import Seller from "../../Models/Seller/Seller.js";
-import StockIncome from "../../Models/Stock/StockIncome.js";
+import {Income} from "../../Models/index.js"
 import { Op } from "sequelize";
 
 /* ===============================
@@ -19,7 +19,7 @@ export const getAllFactors = async (req, res) => {
         {
           model: Seller,
           as: "seller",
-          attributes: ["id", "fullname", "phoneNumber", "address"],
+          attributes: ["id", "fullname", "phoneNumber"],
         },
         // optionally include the StockIncome items? income IDs are stored as JSON in `incomes`
         // we can add a separate endpoint for that or a virtual getter.
@@ -60,7 +60,7 @@ export const getFactorById = async (req, res) => {
         {
           model: Seller,
           as: "seller",
-          attributes: ["id", "fullname", "phoneNumber", "address"],
+          attributes: ["id", "fullname", "phoneNumber",],
         },
       ],
     });
@@ -72,7 +72,7 @@ export const getFactorById = async (req, res) => {
     // Optionally fetch the actual StockIncome records from the incomes array
     let incomeDetails = [];
     if (factor.incomes && factor.incomes.length) {
-      incomeDetails = await StockIncome.findAll({
+      incomeDetails = await Income.findAll({
         where: { id: factor.incomes },
         include: [
           {
@@ -166,7 +166,7 @@ export const getFactorsBySeller = async (req, res) => {
         {
           model: Seller,
           as: "seller",
-          attributes: ["id", "fullname", "phoneNumber", "address"],
+          attributes: ["id", "fullname", "phoneNumber"],
         },
       ],
       order: [["createdAt", "DESC"]],
