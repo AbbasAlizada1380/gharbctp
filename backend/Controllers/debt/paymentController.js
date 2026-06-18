@@ -1,6 +1,8 @@
 import { LoanPayment, Loan, Employee, Wallet } from "../../Models/debt/index.js";
 import sequelize from "../../dbconnection.js";
 import { updateWalletAfterPayment } from "../../utils/walletUpdater.js";
+import { Op } from "sequelize";
+import moment from "moment";
 
 export const makePayment = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -219,6 +221,66 @@ export const deletePayment = async (req, res) => {
     res.status(200).json({ success: true, message: "حذف شد" });
   } catch (error) {
     await transaction.rollback();
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const getPaymentsByDateRange = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    // Build date filter
+    let whereClause = {};
+    if (from || to) {
+      const startDate = from ? moment(from).startOf("day").toDate() : null;
+      const endDate = to ? moment(to).endOf("day").toDate() : null;
+
+      if (startDate && endDate) {
+        whereClause.paymentDate = { [Op.between]: [startDate, endDate] };
+      } else if (startDate) {
+        whereClause.paymentDate = { [Op.gte]: startDate };
+      } else if (endDate) {
+        whereClause.paymentDate = { [Op.lte]: endDate };
+      }
+    }
+
+    // Fetch payments with associations
+    const payments = await LoanPayment.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Loan,
+          as: "Loan",
+          include: [
+            {
+              model: Employee,
+              as: "Employee",
+              attributes: ["id", "fullName"],
+            },
+          ],
+        },
+      ],
+      order: [["paymentDate", "DESC"]],
+    });
+
+    // Compute summary
+    const totalPayments = payments.length;
+    const totalAmount = payments.reduce(
+      (sum, p) => sum + parseFloat(p.amount),
+      0
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        payments,
+        summary: {
+          totalPayments,
+          totalAmount,
+        },
+      },
+    });
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };

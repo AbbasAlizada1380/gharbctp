@@ -29,6 +29,7 @@ import { MdPayment, MdClose } from "react-icons/md";
 import AnimatedModal from "../components/common/common/AnimatedModal";
 import SearchableEmployeeSelect from "../components/common/SearchableEmployeeSelect";
 import LoanPrintReceipt from "../components/common/LoanPrintReceipt";
+import LoanPaymentDownload from "../pages/dashboard/pages/report/LoanPaymentDownload";
 
 const LoansPage = () => {
   const [activeTab, setActiveTab] = useState("active"); // 'active', 'closed', 'create'
@@ -561,6 +562,7 @@ const LoansPage = () => {
           {/* Payment History Tab */}
           {activeTab === "history" && (
             <div className="space-y-4">
+              <LoanPaymentDownload/>
               {activeLoans.map((loan) => (
                 <div
                   key={loan.id}
