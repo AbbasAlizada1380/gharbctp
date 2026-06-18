@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { ToastContainer, toast } from "react-toastify"; // ✅ added missing import
 import "react-toastify/dist/ReactToastify.css";
 import moment from "moment-jalaali";
+import Pagination from "../pagination/Pagination"; // ✅ import the new component
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const API_URL = `${BASE_URL}/factors`;
-const INCOMES_BY_FACTOR = `${BASE_URL}/stock/income/by-factor`; // ✅ new endpoint
+const INCOMES_BY_FACTOR = `${BASE_URL}/stock/income/by-factor`;
 
 const Factors = () => {
   const [factors, setFactors] = useState([]);
@@ -53,26 +55,6 @@ const Factors = () => {
     }
   };
 
-  // Render pagination buttons
-  const renderPageNumbers = () => {
-    const pageNumbers = [];
-    for (let i = 1; i <= pagination.totalPages; i++) {
-      pageNumbers.push(
-        <button
-          key={i}
-          onClick={() => handlePageChange(i)}
-          className={`px-4 py-2 rounded-lg mx-1 ${currentPage === i
-              ? "bg-green-600 text-white"
-              : "bg-gray-100 hover:bg-gray-200"
-            }`}
-        >
-          {i}
-        </button>
-      );
-    }
-    return pageNumbers;
-  };
-
   // Status badge style
   const getStatusBadge = (status) => {
     const base = "px-3 py-1 rounded-full text-sm font-semibold";
@@ -95,7 +77,7 @@ const Factors = () => {
     setLoadingIncomes(true);
     try {
       const response = await axios.get(`${INCOMES_BY_FACTOR}/${factor.id}`, {
-        params: { page: 1, limit: 100 }, // fetch all incomes (adjust as needed)
+        params: { page: 1, limit: 100 },
       });
       setFactorIncomes(response.data.incomes || []);
     } catch (error) {
@@ -129,7 +111,7 @@ const Factors = () => {
               <th className="border p-2 text-sm">سایز</th>
               <th className="border p-2 text-sm">تعداد</th>
               <th className="border p-2 text-sm">قیمت واحد</th>
-              <th className="border p-2 text-sm">مبلغ </th>
+              <th className="border p-2 text-sm">مبلغ</th>
               <th className="border p-2 text-sm">تاریخ</th>
             </tr>
           </thead>
@@ -155,6 +137,19 @@ const Factors = () => {
 
   return (
     <div>
+      <ToastContainer
+        position="top-left"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={true}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+
       {loading ? (
         <div className="text-center py-10">در حال بارگذاری...</div>
       ) : (
@@ -162,7 +157,7 @@ const Factors = () => {
           <div className="bg-white rounded-t-md shadow-lg overflow-hidden overflow-x-auto">
             <table className="min-w-full leading-normal">
               <thead>
-                <tr className="bg-primary text-white text-md font-semibold uppercase tracking-wider">
+                <tr className="bg-cyan-800 text-white text-md font-semibold uppercase tracking-wider">
                   <th className="border border-gray-300 py-3 px-4">شماره فاکتور</th>
                   <th className="border border-gray-300 py-3 px-4">فروشنده</th>
                   <th className="border border-gray-300 py-3 px-4">مبلغ کل</th>
@@ -243,26 +238,12 @@ const Factors = () => {
             </table>
           </div>
 
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div className="flex justify-center items-center p-4 gap-2 mt-4">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={!pagination.hasPrevPage}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                قبلی
-              </button>
-              {renderPageNumbers()}
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={!pagination.hasNextPage}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                بعدی
-              </button>
-            </div>
-          )}
+          {/* ✅ New Pagination Component */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={handlePageChange}
+          />
         </>
       )}
 

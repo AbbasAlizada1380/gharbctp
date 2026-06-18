@@ -3,7 +3,7 @@ import FinancialReports from "./report/FinancialReports"; // Adjust the import p
 import DashboardHome from "./report/DashboardHome";
 import AnalyticsDashboard from "./report/AnalyticsDashboard";
 import CompanyStock from "./CompanyStock";
-
+import CombinedReport from "./report/CombinedReport"
 const Dashboard = () => {
   return (
     <div className=" p-6 bg-gray-50 min-h-screen text-right" dir="rtl">
@@ -14,6 +14,7 @@ const Dashboard = () => {
 
       {/* Render the FinancialReports component */}
       <div className="mt-6">
+        <CombinedReport/>
         <DashboardHome />
         <CompanyStock/>
       </div>

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaMoneyBillWave, FaPlus, FaEdit, FaTrash, FaTimes, FaCheckCircle, FaSpinner, FaSearch } from "react-icons/fa";
 import Pagination from "../pagination/Pagination";
-import DatePayDownload from "./report/export default DatePayDownload;";
+import DatePayDownload from "./report/DatePayDownload;";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const limit = 20;
