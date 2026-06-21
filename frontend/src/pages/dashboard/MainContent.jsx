@@ -2,7 +2,6 @@
 import Dashboard from "./pages/dashboard";
 // import S_Transaction from "./pages/RentManager";
 import Report from "./pages/reports";
-import Orders from "./pages/Orders";
 import AddUser from "./pages/AddUser";
 import Customers from "./pages/Customers";
 import Stock from "./pages/Stock";
@@ -13,6 +12,7 @@ import Receipt from "./pages/Receipt";
 import TakingMoneyManager from "./pages/TakingMoneyManager";
 import CompanyStock from "./pages/CompanyStock";
 import SellersList from "./pages/SellersList";
+import OrdersWithTabs from "./pages/OrdersWithTabs";
 const MainContent = ({ activeComponent }) => {
   const renderContent = () => {
     switch (activeComponent) {
@@ -41,7 +41,7 @@ const MainContent = ({ activeComponent }) => {
       case "ExpenseManager":
         return <ExpenseManager />;
       case "Orders":
-        return <Orders />;
+        return <OrdersWithTabs />;
       case "Receipt":
         return <Receipt />;
       case "AddUser":
