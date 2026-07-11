@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import sizes from "../services/Size.js";
 import Pagination from "../pagination/Pagination"; // Import the Pagination component
+import DateOutgoingDownload from "./report/DateOutgoingDownload.jsx";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const OUTGOING_API_URL = `${BASE_URL}/stock/outgoing`;
@@ -374,7 +375,7 @@ const Outgoing = () => {
           </div>
         </form>
       </div>
-
+<DateOutgoingDownload/>
       {/* Outgoings List */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center">

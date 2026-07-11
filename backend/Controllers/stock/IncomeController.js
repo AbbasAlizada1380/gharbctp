@@ -3,7 +3,7 @@ import sequelize from "../../dbconnection.js";
 import { v4 as uuidv4 } from 'uuid';
 import { Factor } from "../../Models/index.js";
 import { SellerAccount } from "../../Models/index.js";
-
+import { Op } from "sequelize";
 /* ===========================
    Helper: Update Exist Table (with transaction)
 =========================== */
@@ -551,6 +551,101 @@ export const getIncomesByFactorId = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch incomes for this factor",
+      error: error.message,
+    });
+  }
+};
+
+/* ===========================
+   GET INCOMES BY DATE RANGE
+=========================== */
+export const getIncomesByDateRange = async (req, res) => {
+  try {
+    const { from, to, page = 1, limit = 10 } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({
+        success: false,
+        message: "Both 'from' and 'to' dates are required",
+      });
+    }
+
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999); // include entire end date
+
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
+    const offset = (pageNumber - 1) * limitNumber;
+
+    const { count, rows: incomes } = await Income.findAndCountAll({
+      where: {
+        createdAt: {
+          [Op.between]: [fromDate, toDate],
+        },
+      },
+      include: [
+        {
+          model: Seller,
+          as: 'seller',
+          attributes: ['id', 'fullname', 'phoneNumber'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: limitNumber,
+      offset,
+    });
+
+    // ─── Overall totals ──────────────────────────────────────────────
+    const totalMoney = incomes.reduce((sum, inc) => sum + parseFloat(inc.money || 0), 0);
+    const totalSpent = incomes.reduce((sum, inc) => sum + parseFloat(inc.spent || 0), 0);
+    const totalProfit = totalMoney - totalSpent;
+    const totalQuantity = incomes.reduce((sum, inc) => sum + parseFloat(inc.quantity || 0), 0);
+
+    // ─── Size‑wise aggregation ───────────────────────────────────────
+    const sizeMap = incomes.reduce((acc, inc) => {
+      const size = inc.size || 'بدون سایز';
+      if (!acc[size]) {
+        acc[size] = { size, totalQuantity: 0, totalMoney: 0, totalSpent: 0 };
+      }
+      acc[size].totalQuantity += parseFloat(inc.quantity || 0);
+      acc[size].totalMoney += parseFloat(inc.money || 0);
+      acc[size].totalSpent += parseFloat(inc.spent || 0);
+      return acc;
+    }, {});
+
+    // Convert to array and compute profit per size
+    const sizes = Object.values(sizeMap).map((s) => ({
+      ...s,
+      totalProfit: s.totalMoney - s.totalSpent,
+    }));
+
+    // ─── Response ─────────────────────────────────────────────────────
+    res.json({
+      success: true,
+      incomes,
+      summary: {
+        totalItems: count,
+        totalQuantity,
+        totalMoney,
+        totalSpent,
+        totalProfit,
+        sizes, // 👈 size breakdown
+      },
+      pagination: {
+        totalItems: count,
+        totalPages: Math.ceil(count / limitNumber),
+        currentPage: pageNumber,
+        perPage: limitNumber,
+        hasNextPage: pageNumber < Math.ceil(count / limitNumber),
+        hasPrevPage: pageNumber > 1,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching incomes by date range:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching incomes by date range",
       error: error.message,
     });
   }

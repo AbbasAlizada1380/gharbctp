@@ -3,6 +3,7 @@ import axios from "axios";
 import sizes from "../services/Size.js";
 import Pagination from "../pagination/Pagination";
 import Factors from "./Factors.jsx";
+import DateIncomeDownload from "./report/DateIncomeDownload.jsx";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const INCOME_API_URL = `${BASE_URL}/stock/income`;
@@ -455,7 +456,7 @@ const Incoming = () => {
               </div>
             </div>
           )}
-
+          <DateIncomeDownload />
           {/* Buttons */}
           <div className="flex flex-wrap gap-4 pt-4 border-t-2 border-gray-200 mt-6">
             {!editingId && (

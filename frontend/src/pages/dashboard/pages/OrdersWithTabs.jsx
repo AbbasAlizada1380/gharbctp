@@ -7,8 +7,8 @@ const OrdersWithTabs = () => {
   const [activeTab, setActiveTab] = useState("single"); // "single" or "perItem"
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="mx-auto max-w-6xl">
+    <div className=" bg-gray-100 p-6">
+      <div className="mx-auto">
         {/* Tab Buttons */}
         <div className="flex space-x-1 rounded-lg bg-gray-200 p-1 mb-6">
           <button

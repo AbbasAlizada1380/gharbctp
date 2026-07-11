@@ -987,3 +987,86 @@ export const updateOutgoingProperties = async (req, res) => {
     });
   }
 };
+
+
+/* ===========================
+   Get Outgoings by Date Range
+=========================== */
+export const getOutgoingsByDateRange = async (req, res) => {
+  try {
+    const { from, to, page = 1, limit = 10 } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({
+        success: false,
+        message: "Both 'from' and 'to' dates are required",
+      });
+    }
+
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
+    const offset = (pageNumber - 1) * limitNumber;
+
+    const { count, rows: outgoings } = await Outgoing.findAndCountAll({
+      where: {
+        createdAt: {
+          [Op.between]: [fromDate, toDate],
+        },
+      },
+      order: [["createdAt", "DESC"]],
+      limit: limitNumber,
+      offset,
+    });
+
+    // ─── Overall totals ──────────────────────────────────────────────
+    const totalQuantity = outgoings.reduce((sum, o) => sum + parseFloat(o.quantity || 0), 0);
+    const totalMoney = outgoings.reduce((sum, o) => sum + parseFloat(o.money || 0), 0);
+
+    // ─── Size breakdown ──────────────────────────────────────────────
+    const sizeMap = outgoings.reduce((acc, o) => {
+      const size = o.size || "بدون سایز";
+      if (!acc[size]) {
+        acc[size] = { size, totalQuantity: 0, totalMoney: 0 };
+      }
+      acc[size].totalQuantity += parseFloat(o.quantity || 0);
+      acc[size].totalMoney += parseFloat(o.money || 0);
+      return acc;
+    }, {});
+
+    const sizes = Object.values(sizeMap).map((s) => ({
+      ...s,
+      totalProfit: s.totalMoney, // Revenue (cost not calculated here)
+    }));
+    sizes.sort((a, b) => a.size.localeCompare(b.size));
+
+    res.json({
+      success: true,
+      outgoings,
+      summary: {
+        totalItems: count,
+        totalQuantity,
+        totalMoney,
+        sizes,
+      },
+      pagination: {
+        totalItems: count,
+        totalPages: Math.ceil(count / limitNumber),
+        currentPage: pageNumber,
+        perPage: limitNumber,
+        hasNextPage: pageNumber < Math.ceil(count / limitNumber),
+        hasPrevPage: pageNumber > 1,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching outgoings by date range:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching outgoings by date range",
+      error: error.message,
+    });
+  }
+};
