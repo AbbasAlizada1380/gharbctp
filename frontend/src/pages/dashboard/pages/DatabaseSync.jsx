@@ -41,16 +41,12 @@ const DatabaseSync = () => {
     formData.append('sqlFile', selectedFile);
 
     try {
-      // ✅ Use the correct endpoint (matches your route)
       const response = await fetch(`${BASE_URL}/database/import`, {
         method: 'POST',
         body: formData,
-        credentials: 'include', // send cookies if using session auth
-        // headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }, // if using JWT
-        // Do NOT set Content-Type manually – browser sets it with boundary
+        credentials: 'include',
       });
 
-      // The server returns JSON, not text
       const result = await response.json();
 
       if (!response.ok) {
@@ -73,11 +69,9 @@ const DatabaseSync = () => {
     setDownloadMessage('⏳ Generating database backup...');
 
     try {
-      // ✅ Use the correct endpoint
       const response = await fetch(`${BASE_URL}/database/export`, {
         method: 'GET',
         credentials: 'include',
-        // headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
       });
 
       if (!response.ok) {
@@ -107,166 +101,128 @@ const DatabaseSync = () => {
       setIsDownloading(false);
     }
   };
-  // --- RENDER ---
+
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>📂 Database Sync Tool</h2>
-
-      {/* ===== UPLOAD SECTION ===== */}
-      <div style={styles.card}>
-        <h3 style={styles.subtitle}>📤 Upload Local .sql to Hosted Server</h3>
-        <p style={styles.warning}>
-          ⚠️ Warning: This will completely OVERWRITE the hosted database!
-        </p>
-
-        <div style={styles.inputGroup}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".sql"
-            onChange={handleFileChange}
-            disabled={isUploading}
-            style={styles.fileInput}
-          />
-          <button
-            onClick={handleUpload}
-            disabled={!selectedFile || isUploading}
-            style={{
-              ...styles.button,
-              ...styles.uploadButton,
-              opacity: !selectedFile || isUploading ? 0.6 : 1,
-              cursor: !selectedFile || isUploading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isUploading ? '⏳ Uploading...' : '🚀 Upload to Server'}
-          </button>
+    <div className=" bg-white py-8 px-4">
+    <div className=" mx-auto">
+        {/* Header Section */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-cyan-800 mb-2">
+            📂 ابزار هم‌گام‌سازی پایگاه داده
+          </h1>
+          <p className="text-gray-600">
+            بارگذاری فایل .sql محلی به سرور یا دریافت پشتیبان از پایگاه داده میزبان
+          </p>
         </div>
 
-        {uploadMessage && (
-          <p
-            style={{
-              ...styles.message,
-              color: uploadMessage.includes('✅') ? 'green' : 'red',
-            }}
-          >
-            {uploadMessage}
+        {/* Upload Section */}
+        <div className="bg-gray-200 rounded-lg shadow-lg p-6 transition-all duration-300 border border-white/20 mb-6">
+          <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
+            <div className="p-2 bg-cyan-100 rounded-lg">
+              <svg className="w-6 h-6 text-cyan-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-cyan-800">📤 بارگذاری .sql محلی به سرور میزبان</h2>
+          </div>
+
+          <div className="bg-yellow-100 border-r-4 border-yellow-500 text-yellow-700 p-3 mb-4 rounded text-sm font-bold">
+            ⚠️ هشدار: این عمل به طور کامل پایگاه داده میزبان را بازنویسی خواهد کرد!
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".sql"
+              onChange={handleFileChange}
+              disabled={isUploading}
+              className="w-full sm:w-auto px-4 py-3 border border-gray-300 rounded-md focus:ring-1 focus:ring-cyan-800 focus:outline-none transition-all duration-200 bg-gray-50 text-right disabled:opacity-50 cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100"
+            />
+            <button
+              onClick={handleUpload}
+              disabled={!selectedFile || isUploading}
+              className={`bg-cyan-800 text-white py-3 px-7 rounded-xl font-semibold text-lg hover:bg-cyan-700 transform hover:scale-105 transition-all duration-200 shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                !selectedFile || isUploading ? 'opacity-60' : ''
+              }`}
+            >
+              {isUploading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  در حال بارگذاری...
+                </>
+              ) : (
+                '🚀 بارگذاری به سرور'
+              )}
+            </button>
+          </div>
+
+          {uploadMessage && (
+            <p
+              className={`mt-4 p-3 rounded border ${
+                uploadMessage.includes('✅')
+                  ? 'bg-green-100 border-green-300 text-green-800'
+                  : 'bg-red-100 border-red-300 text-red-800'
+              }`}
+            >
+              {uploadMessage}
+            </p>
+          )}
+        </div>
+
+        {/* Download Section */}
+        <div className="bg-gray-200 rounded-lg shadow-lg p-6 transition-all duration-300 border border-white/20">
+          <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
+            <div className="p-2 bg-cyan-100 rounded-lg">
+              <svg className="w-6 h-6 text-cyan-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-cyan-800">📥 دریافت پشتیبان از پایگاه داده میزبان</h2>
+          </div>
+
+          <p className="text-gray-600 text-sm mb-4">
+            کل پایگاه داده فعلی را به عنوان یک فایل .sql (ساختار + داده) دانلود می‌کند.
           </p>
-        )}
-      </div>
 
-      {/* ===== DOWNLOAD SECTION ===== */}
-      <div style={styles.card}>
-        <h3 style={styles.subtitle}>📥 Download Hosted Database to Local</h3>
-        <p style={styles.hint}>
-          Downloads the entire current database as a .sql file (structure + data).
-        </p>
-
-        <button
-          onClick={handleDownload}
-          disabled={isDownloading}
-          style={{
-            ...styles.button,
-            ...styles.downloadButton,
-            opacity: isDownloading ? 0.6 : 1,
-            cursor: isDownloading ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {isDownloading ? '⏳ Generating...' : '⬇️ Download .sql Backup'}
-        </button>
-
-        {downloadMessage && (
-          <p
-            style={{
-              ...styles.message,
-              color: downloadMessage.includes('✅') ? 'green' : 'red',
-            }}
+          <button
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className={`w-full bg-cyan-800 text-white py-3 px-7 rounded-xl font-semibold text-lg hover:bg-cyan-700 transform hover:scale-105 transition-all duration-200 shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+              isDownloading ? 'opacity-60' : ''
+            }`}
           >
-            {downloadMessage}
-          </p>
-        )}
+            {isDownloading ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                در حال تولید...
+              </>
+            ) : (
+              '⬇️ دانلود پشتیبان .sql'
+            )}
+          </button>
+
+          {downloadMessage && (
+            <p
+              className={`mt-4 p-3 rounded border ${
+                downloadMessage.includes('✅')
+                  ? 'bg-green-100 border-green-300 text-green-800'
+                  : 'bg-red-100 border-red-300 text-red-800'
+              }`}
+            >
+              {downloadMessage}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
-};
-
-// --- STYLES (Inline for simplicity - feel free to use Tailwind or CSS Modules) ---
-const styles = {
-  container: {
-    maxWidth: '700px',
-    margin: '40px auto',
-    padding: '20px',
-    fontFamily: 'Arial, sans-serif',
-  },
-  title: {
-    textAlign: 'center',
-    borderBottom: '2px solid #007bff',
-    paddingBottom: '10px',
-    marginBottom: '30px',
-  },
-  card: {
-    backgroundColor: '#f8f9fa',
-    border: '1px solid #dee2e6',
-    borderRadius: '8px',
-    padding: '24px',
-    marginBottom: '24px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-  },
-  subtitle: {
-    marginTop: '0',
-    marginBottom: '12px',
-  },
-  warning: {
-    backgroundColor: '#fff3cd',
-    color: '#856404',
-    padding: '10px 14px',
-    borderRadius: '4px',
-    border: '1px solid #ffc107',
-    fontSize: '14px',
-    fontWeight: 'bold',
-  },
-  hint: {
-    color: '#6c757d',
-    fontSize: '14px',
-    marginBottom: '16px',
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    marginTop: '12px',
-  },
-  fileInput: {
-    padding: '10px',
-    border: '1px dashed #007bff',
-    borderRadius: '4px',
-    backgroundColor: 'white',
-    cursor: 'pointer',
-  },
-  button: {
-    padding: '12px 24px',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: 'white',
-    transition: 'background-color 0.2s ease',
-  },
-  uploadButton: {
-    backgroundColor: '#28a745',
-  },
-  downloadButton: {
-    backgroundColor: '#007bff',
-    width: '100%',
-  },
-  message: {
-    marginTop: '16px',
-    padding: '10px',
-    backgroundColor: 'white',
-    borderRadius: '4px',
-    border: '1px solid #dee2e6',
-    fontSize: '14px',
-    wordBreak: 'break-word',
-  },
 };
 
 export default DatabaseSync;
