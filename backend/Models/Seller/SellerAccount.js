@@ -8,10 +8,6 @@ const SellerAccount = sequelize.define(
     sellerId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      references: {
-        model: Seller,
-        key: "id",
-      },
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
