@@ -5,6 +5,7 @@ import AnalyticsDashboard from "./report/AnalyticsDashboard";
 import CompanyStock from "./CompanyStock";
 import CombinedReport from "./report/CombinedReport"
 import CustomerRemainReport from "./report/CustomerRemainReport";
+import DatabaseSync from "./DatabaseSync";
 const Dashboard = () => {
   return (
     <div className=" p-6 bg-gray-50 min-h-screen text-right" dir="rtl">
@@ -17,6 +18,7 @@ const Dashboard = () => {
       <div className="mt-6">
         <CustomerRemainReport/>
         <CombinedReport/>
+        <DatabaseSync/>
         <DashboardHome />
         <CompanyStock/>
       </div>
