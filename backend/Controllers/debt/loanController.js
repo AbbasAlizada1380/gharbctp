@@ -1,7 +1,7 @@
 import { Loan, Employee, Wallet, LoanPayment } from "../../Models/debt/index.js";
 import sequelize from "../../dbconnection.js";
 import { updateWalletAfterLoan } from "../../utils/walletUpdater.js";
-
+import { Op } from "sequelize";
 export const createLoan = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
@@ -193,5 +193,94 @@ export const closeLoan = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     res.status(500).json({ success: false, error: error.message });
+  }
+};
+export const getLoansByDateRange = async (req, res) => {
+  try {
+    const { startDate, endDate, page = 1, limit = 10 } = req.query;
+
+    // Validate required parameters
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        error: "لطفاً بازه زمانی را مشخص کنید",
+      });
+    }
+
+    // Parse and validate dates
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: "فرمت تاریخ نامعتبر است",
+      });
+    }
+    if (start > end) {
+      return res.status(400).json({
+        success: false,
+        error: "تاریخ شروع باید قبل از تاریخ پایان باشد",
+      });
+    }
+
+    // Include the entire end day (23:59:59.999)
+    end.setHours(23, 59, 59, 999);
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    const { count, rows: loans } = await Loan.findAndCountAll({
+      where: {
+        createdAt: {
+          [Op.between]: [start, end],
+        },
+      },
+      include: [
+        {
+          model: Employee,
+          as: "Employee",
+          attributes: ["id", "fullName", "phone", "position"],
+          required: false, // Still returns loans even if employee deleted? Keep as optional.
+        },
+        {
+          model: LoanPayment,
+          as: "LoanPayments",
+          attributes: ["id", "amount", "paymentDate"],
+          limit: 5,
+          order: [["paymentDate", "DESC"]],
+          required: false,
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: parseInt(limit),
+      offset: offset,
+    });
+
+    // Filter out loans where Employee is missing (if you want to hide orphan loans)
+    const validLoans = loans.filter((loan) => loan.Employee);
+    const totalRemaining = validLoans.reduce(
+      (sum, loan) => sum + parseFloat(loan.remainingAmount || 0),
+      0,
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        loans: validLoans,
+        summary: {
+          totalLoans: validLoans.length,
+          totalRemainingAmount: totalRemaining,
+        },
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          pages: Math.ceil(count / parseInt(limit)),
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 };
