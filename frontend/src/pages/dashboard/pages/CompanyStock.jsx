@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import Pagination from '../pagination/Pagination'; // Adjust path as needed
+import Pagination from '../pagination/Pagination';
 import PalletMoneyManager from './PalletMoneyManager';
 
 const CompanyStock = () => {
@@ -15,7 +15,15 @@ const CompanyStock = () => {
     });
     const [filters, setFilters] = useState({});
 
+    // ---- Update mode state ----
+    const [editingStock, setEditingStock] = useState(null); // the stock item being edited
+    const [editForm, setEditForm] = useState({ quantity: '', size: '' });
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [updateLoading, setUpdateLoading] = useState(false);
+    const [updateError, setUpdateError] = useState('');
+
     const BASE_URL = import.meta.env.VITE_BASE_URL;
+
     // Fetch company stocks
     const fetchCompanyStocks = async (page = 1, limit = 10) => {
         setLoading(true);
@@ -71,14 +79,66 @@ const CompanyStock = () => {
         fetchCompanyStocks(pagination.currentPage, pagination.itemsPerPage);
     };
 
+    // ---- Update handlers ----
+    const openUpdateModal = (stock) => {
+        setEditingStock(stock);
+        setEditForm({
+            quantity: stock.quantity,
+            size: stock.size || ''
+        });
+        setUpdateError('');
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setEditingStock(null);
+        setEditForm({ quantity: '', size: '' });
+        setUpdateError('');
+    };
+
+    const handleUpdateSubmit = async (e) => {
+        e.preventDefault();
+        if (!editingStock) return;
+
+        // Basic validation
+        if (editForm.quantity === '' || isNaN(editForm.quantity) || Number(editForm.quantity) < 0) {
+            setUpdateError('لطفاً مقدار معتبر وارد کنید (عدد مثبت)');
+            return;
+        }
+
+        setUpdateLoading(true);
+        setUpdateError('');
+
+        try {
+            const response = await axios.put(
+                `${BASE_URL}/companystock/${editingStock.id}`,
+                {
+                    quantity: Number(editForm.quantity),
+                    size: editForm.size // if you want to allow size change
+                }
+            );
+            // Refresh the list
+            await fetchCompanyStocks(pagination.currentPage, pagination.itemsPerPage);
+            closeModal();
+            // Optional: show success toast
+            alert('موجودی با موفقیت به‌روزرسانی شد');
+
+        } catch (err) {
+            setUpdateError(err.message || 'خطا در ارتباط با سرور');
+        } finally {
+            setUpdateLoading(false);
+        }
+    };
+
     // Format date
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-        return date.toLocaleDateString('fa-IR'); // Persian date format
+        return date.toLocaleDateString('fa-IR');
     };
 
-    // Render loading state
+    // Render loading state (initial)
     if (loading && companyStocks.length === 0) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -87,7 +147,7 @@ const CompanyStock = () => {
         );
     }
 
-    // Render error state
+    // Render error state (initial)
     if (error && companyStocks.length === 0) {
         return (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
@@ -115,8 +175,6 @@ const CompanyStock = () => {
                 </div>
             </div>
 
-
-
             {/* Data Table */}
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -131,12 +189,15 @@ const CompanyStock = () => {
                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 مقدار
                             </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                عملیات
+                            </th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {companyStocks.length === 0 ? (
                             <tr>
-                                <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                                <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
                                     هیچ داده‌ای یافت نشد
                                 </td>
                             </tr>
@@ -154,11 +215,20 @@ const CompanyStock = () => {
                                     </td>
                                     <td className="px-4 py-3 whitespace-nowrap text-sm">
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${parseInt(stock.quantity) <= 0
-                                            ? 'bg-red-100 text-red-800'
-                                            : 'bg-green-100 text-green-800'
+                                                ? 'bg-red-100 text-red-800'
+                                                : 'bg-green-100 text-green-800'
                                             }`}>
                                             {stock.quantity}
                                         </span>
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                        <button
+                                            onClick={() => openUpdateModal(stock)}
+                                            className="text-blue-600 hover:text-blue-800 transition"
+                                            title="ویرایش موجودی"
+                                        >
+                                            ✏️
+                                        </button>
                                     </td>
                                 </tr>
                             ))
@@ -166,6 +236,8 @@ const CompanyStock = () => {
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination */}
             <div className="mt-6">
                 <Pagination
                     currentPage={pagination.currentPage}
@@ -174,7 +246,7 @@ const CompanyStock = () => {
                 />
             </div>
 
-            {/* Loading overlay for subsequent loads */}
+            {/* Loading overlay (for subsequent loads) */}
             {loading && companyStocks.length > 0 && (
                 <div className="fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center z-50">
                     <div className="bg-white p-4 rounded-lg shadow-lg flex items-center gap-3">
@@ -184,7 +256,67 @@ const CompanyStock = () => {
                 </div>
             )}
 
-           < PalletMoneyManager/>
+            {/* ---- Update Modal ---- */}
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                        <h2 className="text-xl font-bold mb-4">ویرایش موجودی</h2>
+                        <form onSubmit={handleUpdateSubmit}>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    سایز
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editForm.size}
+                                    onChange={(e) => setEditForm({ ...editForm, size: e.target.value })}
+                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    disabled={!editingStock?.sizeEditable} // optionally allow editing size
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    مقدار جدید
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={editForm.quantity}
+                                    onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    required
+                                />
+                            </div>
+                            {updateError && (
+                                <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">
+                                    {updateError}
+                                </div>
+                            )}
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={closeModal}
+                                    className="px-4 py-2 border rounded-md hover:bg-gray-50 transition"
+                                    disabled={updateLoading}
+                                >
+                                    انصراف
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-cyan-800 text-white rounded-md hover:bg-cyan-700 transition disabled:bg-gray-400"
+                                    disabled={updateLoading}
+                                >
+                                    {updateLoading ? 'در حال ذخیره...' : 'ذخیره'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Other components */}
+            <PalletMoneyManager />
         </div>
     );
 };
