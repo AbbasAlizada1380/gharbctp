@@ -14,99 +14,103 @@ const CombinedReport = () => {
   const [downloading, setDownloading] = useState(false);
   const [report, setReport] = useState(null);
 
-  const fetchAll = async () => {
-    if (!from || !to) {
-      alert("لطفاً بازه زمانی را انتخاب کنید");
-      return;
-    }
+const fetchAll = async () => {
+  if (!from || !to) {
+    alert("لطفاً بازه زمانی را انتخاب کنید");
+    return;
+  }
 
-    setLoading(true);
-    setReport(null);
+  setLoading(true);
+  setReport(null);
 
-    try {
-      // Parallel fetch all data
-      const [
-        expRes,
-        attRes,
-        payRes,
-        recRes,
-        loanPayRes,
-        loanRes, // <-- new: fetch loans
-      ] = await Promise.all([
-        axios.get(`${BASE_URL}/expense/date_range`, { params: { from, to } }),
-        axios.get(`${BASE_URL}/attendance/date-range`, { params: { from, to } }),
-        axios.get(`${BASE_URL}/pays/date-range`, { params: { from, to } }),
-        axios.get(`${BASE_URL}/receipts/date_range`, { params: { from, to } }),
-        axios.get(`${BASE_URL}/payments`, { params: { from, to } }),
-        axios.get(`${BASE_URL}/loans/date-range`, {
-          params: { startDate: from, endDate: to },
-        }),
-      ]);
+  try {
+    // Define all requests with their params
+    const requests = [
+      { url: `${BASE_URL}/expense/date_range`, params: { from, to } },
+      { url: `${BASE_URL}/attendance/date-range`, params: { from, to } },
+      { url: `${BASE_URL}/pays/date-range`, params: { from, to } },
+      { url: `${BASE_URL}/receipts/date_range`, params: { from, to } },
+      { url: `${BASE_URL}/payments`, params: { from, to } },
+      { url: `${BASE_URL}/loans/date-range`, params: { startDate: from, endDate: to } },
+    ];
 
-      const expenses = expRes.data?.expenses || [];
-      const salaries = attRes.data?.data || [];
-      const pays = payRes.data?.data?.pays || [];
-      const receipts = recRes.data?.data?.receipts || [];
-      const loanPayments = loanPayRes.data?.data?.payments || [];
-      const loans = loanRes.data?.data?.loans || [];
+    // Fetch all with individual error handling
+    const settled = await Promise.allSettled(
+      requests.map(({ url, params }) => axios.get(url, { params }))
+    );
 
-      // Compute totals
-      const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-      const totalSalaries = salaries.reduce((s, a) => s + Number(a.total || 0), 0);
-      const totalPays = pays.reduce((s, p) => s + Number(p.amount || 0), 0);
-      const totalReceipts = receipts.reduce((s, r) => s + Number(r.amount || 0), 0);
-      const totalLoanPayments = loanPayments.reduce(
-        (s, lp) => s + Number(lp.amount || 0),
-        0
-      );
-      const totalLoans = loans.reduce((s, l) => s + Number(l.amount || 0), 0);
-      const totalRemainingLoans = loans.reduce(
-        (s, l) => s + Number(l.remainingAmount || 0),
-        0
-      );
+    // Extract data with fallbacks (order must match the requests array)
+    const expRes = settled[0].status === 'fulfilled' ? settled[0].value.data : { expenses: [] };
+    const attRes = settled[1].status === 'fulfilled' ? settled[1].value.data : { data: [] };
+    const payRes = settled[2].status === 'fulfilled' ? settled[2].value.data : { data: { pays: [] } };
+    const recRes = settled[3].status === 'fulfilled' ? settled[3].value.data : { data: { receipts: [] } };
+    const loanPayRes = settled[4].status === 'fulfilled' ? settled[4].value.data : { data: { payments: [] } };
+    const loanRes = settled[5].status === 'fulfilled' ? settled[5].value.data : { data: { loans: [] } };
 
-      // Incoming = receipts + loan repayments
-      const totalIncoming = totalReceipts + totalLoanPayments;
-      // Outgoing = expenses + salaries + vendor payments + loans issued
-      const totalOutgoing = totalExpenses + totalSalaries + totalPays + totalLoans;
-      const net = totalIncoming - totalOutgoing;
+    // Get arrays safely
+    const expenses = expRes.expenses || [];
+    const salaries = attRes.data || [];
+    const pays = payRes.data?.pays || [];
+    const receipts = recRes.data?.receipts || [];
+    const loanPayments = loanPayRes.data?.payments || [];
+    const loans = loanRes.data?.loans || [];
 
-      setReport({
-        dateRange: { from, to },
-        expenses: { list: expenses, total: totalExpenses, count: expenses.length },
-        salaries: { list: salaries, total: totalSalaries, count: salaries.length },
-        pays: { list: pays, total: totalPays, count: pays.length },
-        receipts: { list: receipts, total: totalReceipts, count: receipts.length },
-        loanPayments: {
-          list: loanPayments,
-          total: totalLoanPayments,
-          count: loanPayments.length,
-        },
-        loans: {
-          list: loans,
-          total: totalLoans,
-          count: loans.length,
-          totalRemaining: totalRemainingLoans,
-        },
-        summary: {
-          totalIncoming,
-          totalOutgoing,
-          net,
-          totalExpenses,
-          totalSalaries,
-          totalPays,
-          totalReceipts,
-          totalLoanPayments,
-          totalLoans,
-        },
-      });
-    } catch (err) {
-      console.error(err);
-      alert("خطا در دریافت اطلاعات. لطفاً دوباره تلاش کنید.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    // --- All computations remain exactly the same ---
+    const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const totalSalaries = salaries.reduce((s, a) => s + Number(a.total || 0), 0);
+    const totalPays = pays.reduce((s, p) => s + Number(p.amount || 0), 0);
+    const totalReceipts = receipts.reduce((s, r) => s + Number(r.amount || 0), 0);
+    const totalLoanPayments = loanPayments.reduce(
+      (s, lp) => s + Number(lp.amount || 0),
+      0
+    );
+    const totalLoans = loans.reduce((s, l) => s + Number(l.amount || 0), 0);
+    const totalRemainingLoans = loans.reduce(
+      (s, l) => s + Number(l.remainingAmount || 0),
+      0
+    );
+
+    const totalIncoming = totalReceipts + totalLoanPayments;
+    const totalOutgoing = totalExpenses + totalSalaries + totalPays + totalLoans;
+    const net = totalIncoming - totalOutgoing;
+
+    setReport({
+      dateRange: { from, to },
+      expenses: { list: expenses, total: totalExpenses, count: expenses.length },
+      salaries: { list: salaries, total: totalSalaries, count: salaries.length },
+      pays: { list: pays, total: totalPays, count: pays.length },
+      receipts: { list: receipts, total: totalReceipts, count: receipts.length },
+      loanPayments: {
+        list: loanPayments,
+        total: totalLoanPayments,
+        count: loanPayments.length,
+      },
+      loans: {
+        list: loans,
+        total: totalLoans,
+        count: loans.length,
+        totalRemaining: totalRemainingLoans,
+      },
+      summary: {
+        totalIncoming,
+        totalOutgoing,
+        net,
+        totalExpenses,
+        totalSalaries,
+        totalPays,
+        totalReceipts,
+        totalLoanPayments,
+        totalLoans,
+      },
+    });
+  } catch (err) {
+    // This catch will only run if something else goes wrong (e.g. state update)
+    console.error(err);
+    alert("خطا در دریافت اطلاعات. لطفاً دوباره تلاش کنید.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const formatNum = (num) => Number(num || 0).toLocaleString();
 
