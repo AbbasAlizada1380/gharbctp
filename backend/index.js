@@ -108,7 +108,7 @@ app.use("/wallets", walletRoutes);
 
 // Sync database and start server
 sequelize
-  .sync({ alter: false })
+  .sync({ alter: true })
   .then(() => {
     app.listen(port, () => {
       console.log(`✅ Server is running on port ${port}`);

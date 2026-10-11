@@ -9,11 +9,22 @@ export const createOrderItem = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    let { customer, newCustomerName, orderItems } = req.body;
+    let { customer, newCustomerName, orderItems, userId: bodyUserId } = req.body;
 
-    console.log("Received data:", req.body); // Add this for debugging
+    console.log("Received data:", req.body);
+
+    // ✅ Resolve the user making the request
+    const userId = req.user?.id || bodyUserId;
+
+    if (!userId) {
+      await transaction.rollback();
+      return res.status(401).json({
+        message: "User is not authenticated",
+      });
+    }
 
     if (!Array.isArray(orderItems) || orderItems.length === 0) {
+      await transaction.rollback();
       return res.status(400).json({
         message: "orderItems are required",
       });
@@ -26,6 +37,7 @@ export const createOrderItem = async (req, res) => {
       customerRecord = await Customer.findByPk(customer, { transaction });
 
       if (!customerRecord) {
+        await transaction.rollback();
         return res.status(404).json({ message: "Customer not found" });
       }
     } else if (newCustomerName) {
@@ -37,6 +49,7 @@ export const createOrderItem = async (req, res) => {
         { transaction }
       );
     } else {
+      await transaction.rollback();
       return res.status(400).json({
         message: "Either customer or newCustomerName is required",
       });
@@ -44,85 +57,51 @@ export const createOrderItem = async (req, res) => {
 
     const customerId = customerRecord.id;
 
-    // 🔹 2. Validate stock availability before processing
-    const stockUpdates = [];
-    const createdOrderItems = [];
-
-    for (const item of orderItems) {
-      const { size, qnty, price, money, fileName, invoiceNumber } = item; // <-- Add invoiceNumber here
-
-      if (!size || !qnty || !price) {
-        throw new Error("Each order item must have size, qnty and price");
-      }
-
-      const quantity = Number(qnty);
-      const itemPrice = Number(price);
-
-      // Validate numbers
-      if (isNaN(quantity) || quantity <= 0) {
-        throw new Error(`Invalid quantity: ${qnty}`);
-      }
-      if (isNaN(itemPrice) || itemPrice <= 0) {
-        throw new Error(`Invalid price: ${price}`);
-      }
-
-      // Check stock availability
-      const companyStock = await CompanyStock.findOne({
-        where: { size },
-        transaction,
-        lock: transaction.LOCK.UPDATE // Lock the row for update
-      });
-
-      if (!companyStock) {
-        throw new Error(`Size ${size} not found in company stock`);
-      }
-
-      const currentStock = parseInt(companyStock.quantity);
-      if (isNaN(currentStock)) {
-        throw new Error(`Invalid stock quantity for size ${size}`);
-      }
-
-      if (currentStock < quantity) {
-        throw new Error(`Insufficient stock for size ${size}. Available: ${currentStock}, Requested: ${quantity}`);
-      }
-
-      stockUpdates.push({
-        companyStock,
-        quantity,
-        size
+    // 🔹 1.5. Build a price lookup map from the customer's priceList
+    const priceMap = new Map();
+    if (Array.isArray(customerRecord.priceList)) {
+      customerRecord.priceList.forEach((entry) => {
+        if (entry && entry.size) {
+          const key = entry.size.trim().replace(/\s+/g, " ");
+          priceMap.set(key, Number(entry.price) || 0);
+        }
       });
     }
 
-    // 🔹 3. Process order items and update stock
+    // 🔹 2. Validate each item (no stock check anymore)
+    const createdOrderItems = [];
+
     for (const item of orderItems) {
-      const { size, qnty, price, money, fileName, invoiceNumber } = item; // <-- Add invoiceNumber here too
+      const { size, qnty, money, fileName, invoiceNumber } = item;
+
+      if (!size || !qnty) {
+        throw new Error("Each order item must have size and qnty");
+      }
+
       const quantity = Number(qnty);
-      const itemPrice = Number(price);
-
-      // Find the stock item for this size
-      const stockItem = stockUpdates.find(s => s.size === size);
-      if (!stockItem) {
-        throw new Error(`Stock information not found for size ${size}`);
+      if (isNaN(quantity) || quantity <= 0) {
+        throw new Error(`Invalid quantity: ${qnty}`);
       }
 
-      // Calculate new quantity
-      const currentQuantity = parseInt(stockItem.companyStock.quantity);
-      const newQuantity = currentQuantity - quantity;
+      const normalizedSize = size.trim().replace(/\s+/g, " ");
 
-      // Validate calculations
-      if (isNaN(newQuantity) || newQuantity < 0) {
-        throw new Error(`Invalid quantity calculation for size ${size}`);
+      let itemPrice;
+      if (priceMap.has(normalizedSize)) {
+        itemPrice = priceMap.get(normalizedSize);
+      } else if (item.price !== undefined && item.price !== null) {
+        itemPrice = Number(item.price);
+      } else {
+        throw new Error(
+          `No price found for size "${size}" in customer's price list and no price provided`
+        );
       }
 
-      // Update company stock - only update quantity
-      await stockItem.companyStock.update(
-        {
-          quantity: newQuantity.toString(),
-        },
-        { transaction }
-      );
+      if (isNaN(itemPrice) || itemPrice <= 0) {
+        throw new Error(
+          `Invalid price for size ${size}. Make sure it's set in the customer's price list.`
+        );
+      }
 
-      // Calculate order item money
       let orderItemMoney;
       if (money && !isNaN(Number(money)) && Number(money) > 0) {
         orderItemMoney = Number(money);
@@ -130,17 +109,20 @@ export const createOrderItem = async (req, res) => {
         orderItemMoney = quantity * itemPrice;
       }
 
-      // Create order item
+      // ✅ Create the order item WITHOUT touching stock.
+      //    `approved` defaults to false in the model.
       const orderItem = await OrderItem.create(
         {
-          size,
+          size: normalizedSize,
           qnty: quantity,
           price: itemPrice,
           money: orderItemMoney,
           fileName: fileName || null,
           customerId,
-          invoiceNumber: invoiceNumber || null, // <-- Use invoiceNumber from item
+          invoiceNumber: invoiceNumber || null,
           customerName: customerRecord.fullname,
+          userId,
+          approved: false, // 👈 pending approval
         },
         { transaction }
       );
@@ -148,10 +130,10 @@ export const createOrderItem = async (req, res) => {
       createdOrderItems.push(orderItem);
     }
 
-    // 🔹 4. Collect OrderItem IDs
+    // 🔹 3. Collect OrderItem IDs
     const orderItemIds = createdOrderItems.map((item) => item.id);
 
-    // 🔹 5. Find or create Remain
+    // 🔹 4. Find or create Remain
     let remain = await Remain.findOne({
       where: { customerId },
       transaction,
@@ -178,64 +160,230 @@ export const createOrderItem = async (req, res) => {
       );
     }
 
-    // 🔹 6. Log stock changes
-    const stockChangeLogs = [];
-    for (const update of stockUpdates) {
-      const previousQuantity = parseInt(update.companyStock.quantity) + update.quantity;
-      stockChangeLogs.push({
-        size: update.size,
-        previousQuantity,
-        newQuantity: parseInt(update.companyStock.quantity),
-        change: -update.quantity
-      });
-    }
-
     await transaction.commit();
 
     res.status(201).json({
-      message: "Order created successfully and stock updated",
+      message: "Order created successfully (pending approval)",
       customer: customerRecord,
       orderItems: createdOrderItems,
       remain,
-      stockUpdates: stockChangeLogs,
       summary: {
-        totalItemsOrdered: orderItems.reduce((sum, item) => sum + Number(item.qnty), 0),
-        uniqueSizesOrdered: [...new Set(orderItems.map(item => item.size))],
-        stockReduced: stockChangeLogs.reduce((sum, log) => sum + log.change, 0)
-      }
+        totalItemsOrdered: orderItems.reduce(
+          (sum, item) => sum + Number(item.qnty),
+          0
+        ),
+        uniqueSizesOrdered: [...new Set(orderItems.map((item) => item.size))],
+        pendingApproval: createdOrderItems.length,
+      },
     });
   } catch (error) {
     await transaction.rollback();
     console.error("Error creating order:", error);
 
-    // Determine appropriate status code
     let statusCode = 500;
-    if (error.message.includes("not found") ||
-      error.message.includes("Insufficient stock") ||
-      error.message.includes("Invalid")) {
+    if (
+      error.message.includes("not found") ||
+      error.message.includes("Invalid") ||
+      error.message.includes("No price found") ||
+      error.message.includes("price list")
+    ) {
       statusCode = 400;
     }
 
     res.status(statusCode).json({
       message: "Error creating order",
       error: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      details:
+        process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 };
 
+// Helper at the top of the file
+const normalizeSize = (s) => (s || "").trim().replace(/\s+/g, " ");
 
+// Helper to find stock with normalization fallback
+const findCompanyStockBySize = async (size, transaction) => {
+  const normalized = normalizeSize(size);
 
+  // 1. Fast path — exact match
+  let stock = await CompanyStock.findOne({
+    where: { size },
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+
+  if (stock) return stock;
+
+  // 2. Slow path — try normalized match
+  const all = await CompanyStock.findAll({
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+
+  stock = all.find((s) => normalizeSize(s.size) === normalized);
+  return stock || null;
+};
+
+export const approveOrderItems = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { orderItemIds } = req.body;
+
+    if (!Array.isArray(orderItemIds) || orderItemIds.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "orderItemIds must be a non-empty array",
+      });
+    }
+
+    // 🔹 1. Load the order items
+    const orderItems = await OrderItem.findAll({
+      where: { id: orderItemIds },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    if (!orderItems.length) {
+      await transaction.rollback();
+      return res.status(404).json({
+        message: "No order items found for the provided IDs",
+      });
+    }
+
+    // 🔹 2. Filter out ones that are already approved
+    const pendingItems = orderItems.filter((item) => !item.approved);
+
+    if (!pendingItems.length) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "All selected order items are already approved",
+      });
+    }
+
+    // 🔹 3. Validate stock for all pending items first (fail fast)
+    const stockUpdates = [];
+
+    for (const item of pendingItems) {
+      const size = normalizeSize(item.size);
+      const quantity = Number(item.qnty);
+
+      if (!size || isNaN(quantity) || quantity <= 0) {
+        throw new Error(`Invalid order item data for id ${item.id}`);
+      }
+
+      const companyStock = await findCompanyStockBySize(size, transaction);
+
+      if (!companyStock) {
+        throw new Error(
+          `Size "${size}" not found in company stock. Please make sure the stock sizes match exactly.`
+        );
+      }
+
+      const currentStock = parseInt(companyStock.quantity);
+      if (isNaN(currentStock)) {
+        throw new Error(`Invalid stock quantity for size ${size}`);
+      }
+
+      if (currentStock < quantity) {
+        throw new Error(
+          `Insufficient stock for size ${size}. Available: ${currentStock}, Requested: ${quantity}`
+        );
+      }
+
+      stockUpdates.push({ companyStock, quantity, size, orderItem: item });
+    }
+
+    // 🔹 4. Deduct stock and mark items approved
+    const stockChangeLogs = [];
+
+    for (const update of stockUpdates) {
+      const currentQuantity = parseInt(update.companyStock.quantity);
+      const newQuantity = currentQuantity - update.quantity;
+
+      await update.companyStock.update(
+        { quantity: newQuantity.toString() },
+        { transaction }
+      );
+
+      await update.orderItem.update({ approved: true }, { transaction });
+
+      stockChangeLogs.push({
+        orderItemId: update.orderItem.id,
+        size: update.size,
+        previousQuantity: currentQuantity,
+        newQuantity,
+        change: -update.quantity,
+      });
+    }
+
+    await transaction.commit();
+
+    res.status(200).json({
+      message: "Order items approved and stock updated",
+      approvedCount: stockUpdates.length,
+      skippedCount: orderItems.length - pendingItems.length,
+      approvedItems: pendingItems.map((i) => i.id),
+      stockUpdates: stockChangeLogs,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error approving order items:", error);
+
+    let statusCode = 500;
+    if (
+      error.message.includes("not found") ||
+      error.message.includes("Insufficient stock") ||
+      error.message.includes("Invalid") ||
+      error.message.includes("already approved")
+    ) {
+      statusCode = 400;
+    }
+
+    res.status(statusCode).json({
+      message: "Error approving order items",
+      error: error.message,
+      details:
+        process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
 /* ===========================
    Get Order Items (Paginated)
 =========================== */
+
 export const getOrderItems = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
+    // ✅ Resolve the user making the request
+    const userId = req.user?.id || req.query.userId;
+    const userRole = req.user?.role || req.query.role;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "User is not authenticated",
+      });
+    }
+
+    // 🔹 Build the where clause based on role
+    const whereClause = {};
+
+    if (userRole === "designer") {
+      // Designer sees only their own order items
+      whereClause.userId = userId;
+    } else if (userRole === "admin") {
+      // Admin sees all order items — no filter
+    } else {
+      // Any other role: restrict to their own items for safety
+      whereClause.userId = userId;
+    }
+
     const { count, rows } = await OrderItem.findAndCountAll({
+      where: whereClause,
       order: [["id", "DESC"]],
       limit,
       offset,
@@ -756,8 +904,8 @@ export const getOrderItemsByCustomerAndDateRange = async (req, res) => {
       totalReceipt: formattedItems.reduce((sum, item) => sum + item.receipt, 0),
       totalRemaining: formattedItems.reduce((sum, item) => sum + item.remaining, 0),
       uniqueSizes: [...new Set(formattedItems.map(item => item.size))],
-      averageOrderValue: formattedItems.length > 0 
-        ? formattedItems.reduce((sum, item) => sum + item.money, 0) / formattedItems.length 
+      averageOrderValue: formattedItems.length > 0
+        ? formattedItems.reduce((sum, item) => sum + item.money, 0) / formattedItems.length
         : 0
     };
 
@@ -799,7 +947,7 @@ export const getOrderItemsByCustomerAndDateRange = async (req, res) => {
 
   } catch (error) {
     console.error("Error in getOrderItemsByCustomerAndDateRange:", error);
-    
+
     res.status(500).json({
       success: false,
       message: "Error fetching order items",

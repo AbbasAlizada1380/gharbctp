@@ -9,7 +9,8 @@ import {
   getCustomerOrdersByType,
   simpleSearchOrderItems,
   getOrderItemsByDateRange,
-  getOrderItemsByCustomerAndDateRange, // 👈 ADD THIS IMPORT
+  getOrderItemsByCustomerAndDateRange,
+  approveOrderItems, // 👈 ADD THIS IMPORT
 } from "../Controllers/OrderItemsController.js";
 
 const OrderItemRoute = express.Router();
@@ -25,6 +26,7 @@ OrderItemRoute.get("/:id", getOrderItemById);
 
 OrderItemRoute.patch("/:id", updateOrderItemProperties);
 OrderItemRoute.post("/", createOrderItem);
+OrderItemRoute.post("/approve", approveOrderItems);
 OrderItemRoute.get("/", getOrderItems);
 OrderItemRoute.put("/:id", updateOrderItem);
 OrderItemRoute.delete("/:id", deleteOrderItem);

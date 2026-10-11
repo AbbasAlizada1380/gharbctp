@@ -1,5 +1,5 @@
 import Outgoing from "../../Models/Stock/outgoing.js";
-import Income from "../../Models/Stock/income.js";
+import {Income} from "../../Models/index.js";
 import Exist from "../../Models/Stock/exist.js";
 import CompanyStock from "../../Models/CompanyStock.js"; // Import CompanyStock model
 import sequelize from "../../dbconnection.js";

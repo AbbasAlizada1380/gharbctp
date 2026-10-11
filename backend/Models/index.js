@@ -1,21 +1,24 @@
 import sequelize from '../dbconnection.js';
 import Seller from './Seller/Seller.js';
-import Income from './Stock/Income.js';                     // main Income model
+import Income from './Stock/Income.js';
 import SellerAccount from './Seller/SellerAccount.js';
 import Pay from './Finance/Pay.js';
 import Factor from './Finance/Factor.js';
 import User from './user.js';
-import Exist from './Stock/exist.js'
+import Exist from './Stock/exist.js';
+import Customer from './Customers.js';
+import OrderItem from './OrderItems.js';   // ✅ new import
 
-// Build models object with consistent keys
 const models = {
   Seller,
   SellerAccount,
   Factor,
-  Income,               // ✅ used in associations as Income
-  Exist ,    // ✅ alias for StockExist (used in controller)
+  Income,
+  Exist,
   Pay,
-  // Include other models if needed elsewhere
+  User,          // ✅ add
+  Customer,      // ✅ add (if you want to centralize)
+  OrderItem,     // ✅ add
 };
 
 // ========== INCOME ASSOCIATION ==========
@@ -25,7 +28,7 @@ Income.associate = (models) => {
 
 // ========== SELLER ASSOCIATION ==========
 Seller.associate = (models) => {
-  Seller.hasMany(models.Income, { foreignKey: "sellerId", as: "incomes" });     // ✅ use models.Income
+  Seller.hasMany(models.Income, { foreignKey: "sellerId", as: "incomes" });
   Seller.hasOne(models.SellerAccount, { foreignKey: "sellerId", as: "account" });
   Seller.hasMany(models.Pay, { foreignKey: "seller", as: "payments" });
   Seller.hasMany(models.Factor, { foreignKey: "sellerId", as: "factors" });
@@ -46,6 +49,16 @@ Factor.associate = (models) => {
   Factor.belongsTo(models.Seller, { foreignKey: "sellerId", as: "seller" });
 };
 
+// ========== USER ASSOCIATION ==========
+User.associate = (models) => {
+  User.hasMany(models.OrderItem, { foreignKey: "userId", as: "orderItems" });
+};
+
+// ========== CUSTOMER ASSOCIATION ==========
+Customer.associate = (models) => {
+  Customer.hasMany(models.OrderItem, { foreignKey: "customerId", as: "orderItems" });
+};
+
 // Apply all associations
 Object.keys(models).forEach(modelName => {
   if (models[modelName] && models[modelName].associate) {
@@ -53,14 +66,16 @@ Object.keys(models).forEach(modelName => {
   }
 });
 
-// Export all models and sequelize instance
 export {
   sequelize,
   Seller,
   SellerAccount,
   Factor,
   Income,
-  Exist as StockExist,   // export both names if needed
-  Exist,                 // ✅ directly as Exist for controller
+  Exist as StockExist,
+  Exist,
   Pay,
+  User,
+  Customer,
+  OrderItem,      // ✅ export it
 };

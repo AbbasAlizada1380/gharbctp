@@ -8,7 +8,6 @@ const OrderItem = sequelize.define(
     size: {
       type: DataTypes.STRING,
     },
-
     qnty: {
       type: DataTypes.INTEGER,
       validate: {
@@ -30,12 +29,11 @@ const OrderItem = sequelize.define(
         min: 0,
       },
     },
-
     money: {
       type: DataTypes.DECIMAL(10, 2),
       validate: {
         min: 0,
-      }
+      },
     },
     receipt: {
       type: DataTypes.DECIMAL(10, 2),
@@ -43,18 +41,32 @@ const OrderItem = sequelize.define(
         min: 0,
       },
     },
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    approved: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
   },
   {
     timestamps: true,
   }
 );
-OrderItem.belongsTo(Customer, {
-  foreignKey: 'customerId',
-  as: 'customer'
-});
 
-Customer.hasMany(OrderItem, {
-  foreignKey: 'customerId',
-  as: 'orderItems'
-});
+// ---- Associations ----
+OrderItem.associate = (models) => {
+  OrderItem.belongsTo(models.Customer, {
+    foreignKey: "customerId",
+    as: "customer",
+  });
+
+  OrderItem.belongsTo(models.User, {
+    foreignKey: "userId",
+    as: "user",
+  });
+};
+
 export default OrderItem;

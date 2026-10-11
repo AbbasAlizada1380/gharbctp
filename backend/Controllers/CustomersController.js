@@ -3,29 +3,79 @@ import Remain from "../Models/Remain.js";
 import { Op } from "sequelize";
 
 /* ===========================
+   Default Price List (fixed sizes)
+=========================== */
+const DEFAULT_PRICE_LIST = [
+  { size: "1030 × 820 mm", price: 0 },
+  { size: "1030 × 770 mm", price: 0 },
+  { size: "745 × 605 mm", price: 0 },
+  { size: "724 × 615 mm", price: 0 },
+  { size: "650 × 550 mm", price: 0 },
+  { size: "645 × 510 mm", price: 0 },
+  { size: "510 × 400 mm", price: 0 },
+  { size: "450 × 370 mm", price: 0 },
+];
+
+/* ===========================
+   Helper: normalize price list
+=========================== */
+const normalizePriceList = (value) => {
+  if (!Array.isArray(value)) return DEFAULT_PRICE_LIST;
+
+  const seen = new Set();
+  const unique = [];
+
+  value.forEach((item) => {
+    if (item && item.size && !seen.has(item.size)) {
+      seen.add(item.size);
+      unique.push({
+        size: item.size,
+        price: Number(item.price) || 0,
+      });
+    }
+  });
+
+  return unique.length ? unique : DEFAULT_PRICE_LIST;
+};
+
+/* ===========================
    Create Customer
 =========================== */
 export const createCustomer = async (req, res) => {
   const transaction = await Customer.sequelize.transaction();
   try {
-    const { fullname, phoneNumber, isActive, initialRemain } = req.body;
+    const {
+      fullname,
+      phoneNumber,
+      isActive,
+      initialRemain,
+      priceList,
+    } = req.body;
 
     if (!fullname) {
+      await transaction.rollback();
       return res.status(400).json({ message: "Full name is required" });
     }
 
     // Create customer within transaction
-    const customer = await Customer.create({
-      fullname,
-      phoneNumber,
-      isActive: isActive ?? true,
-    }, { transaction });
+    const customer = await Customer.create(
+      {
+        fullname,
+        phoneNumber,
+        isActive: isActive ?? true,
+        priceList: normalizePriceList(priceList),
+      },
+      { transaction }
+    );
 
     // Create initial Remain record for the customer
-    const remain = await Remain.create({
-      customerId: customer.id,
-      orderId: initialRemain?.orderId || [], // Accept initial order IDs if provided
-    }, { transaction });
+    const remain = await Remain.create(
+      {
+        customerId: customer.id,
+        orderId: initialRemain?.orderId || [], // Accept initial order IDs if provided
+      },
+      { transaction }
+    );
 
     // Commit transaction
     await transaction.commit();
@@ -39,35 +89,39 @@ export const createCustomer = async (req, res) => {
           id: remain.id,
           customerId: remain.customerId,
           orderId: remain.orderId,
-          createdAt: remain.createdAt
-        }
-      }
+          createdAt: remain.createdAt,
+        },
+      },
     });
   } catch (error) {
     // Rollback transaction on error
     await transaction.rollback();
     console.error(error);
-    
+
     // Handle specific errors
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ 
+    if (error.name === "SequelizeUniqueConstraintError") {
+      return res.status(400).json({
         success: false,
         message: "Phone number already exists",
-        error: error.errors.map(err => err.message)
+        error: error.errors.map((err) => err.message),
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       success: false,
-      message: "Error creating customer", 
-      error: error.message 
+      message: "Error creating customer",
+      error: error.message,
     });
   }
 };
+
+/* ===========================
+   Get Active Customers
+=========================== */
 export const getActiveCustomers = async (req, res) => {
   try {
     const activeCustomers = await Customer.findAll({
-      where: { isActive: true }, // only active customers
+      where: { isActive: true },
       order: [["createdAt", "DESC"]],
     });
 
@@ -83,7 +137,6 @@ export const getActiveCustomers = async (req, res) => {
     });
   }
 };
-
 
 /* ===========================
    Get Customers (Paginated)
@@ -118,7 +171,6 @@ export const getCustomers = async (req, res) => {
   }
 };
 
-
 /* ===========================
    Get Customer by ID
 =========================== */
@@ -144,7 +196,7 @@ export const getCustomerById = async (req, res) => {
 export const updateCustomer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullname, phoneNumber, isActive } = req.body;
+    const { fullname, phoneNumber, isActive, priceList } = req.body;
 
     const customer = await Customer.findByPk(id);
     if (!customer) {
@@ -155,6 +207,9 @@ export const updateCustomer = async (req, res) => {
       fullname,
       phoneNumber,
       isActive,
+      ...(priceList !== undefined && {
+        priceList: normalizePriceList(priceList),
+      }),
     });
 
     res.json(customer);
@@ -170,11 +225,16 @@ export const updateCustomer = async (req, res) => {
 export const updateCustomerProperties = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
 
     const customer = await Customer.findByPk(id);
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
+    }
+
+    // Normalize price list if provided
+    if (updateData.priceList !== undefined) {
+      updateData.priceList = normalizePriceList(updateData.priceList);
     }
 
     await customer.update(updateData);
@@ -183,6 +243,49 @@ export const updateCustomerProperties = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error updating customer", error });
+  }
+};
+
+/* ===========================
+   Update Single Size Price (PATCH)
+=========================== */
+export const updatePriceForSize = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { size, price } = req.body;
+
+    if (!size) {
+      return res.status(400).json({ message: "size is required" });
+    }
+
+    const customer = await Customer.findByPk(id);
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    const current = normalizePriceList(customer.priceList);
+    let found = false;
+
+    const updated = current.map((item) => {
+      if (item.size === size) {
+        found = true;
+        return { size, price: Number(price) || 0 };
+      }
+      return item;
+    });
+
+    // If the size doesn't exist, add it
+    if (!found) {
+      updated.push({ size, price: Number(price) || 0 });
+    }
+
+    customer.priceList = updated;
+    await customer.save();
+
+    res.json(customer);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error updating price", error });
   }
 };
 
