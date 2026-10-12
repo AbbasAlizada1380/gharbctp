@@ -125,24 +125,13 @@ const Sidebar = ({ setActiveComponent }) => {
     const userRole = currentUser.role;
 
     if (userRole === "admin") {
+      // Admin sees all components
       accessibleComponents = AllComponents;
-    } else if (userRole === "reception") {
-      const receptionAllowedValues = [
-        "home",
-        "Orders",
-        "Customers",
-        "Receipt",
-        "Stock",
-        "CompanyStock",
-        "ExpenseManager",
-        "Money",
-        "StaffManager",
-        "SalaryManagement",
-        "financialDashboard", // Add to allowed list for reception
-        "signout",
-      ];
+    } else if (userRole === "designer") {
+      // Designer only sees Orders and Customers (plus signout for usability)
+      const designerAllowedValues = ["home","Orders", "Customers", "signout"];
       accessibleComponents = AllComponents.filter((component) =>
-        receptionAllowedValues.includes(component.value)
+        designerAllowedValues.includes(component.value)
       );
     } else {
       accessibleComponents = AllComponents.filter(

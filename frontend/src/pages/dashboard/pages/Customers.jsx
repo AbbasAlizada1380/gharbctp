@@ -2,11 +2,28 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Pagination from "../pagination/Pagination";
 import RemainOrderItems from "./RemainOrderItems"; // adjust path if needed
-import { FaUsers, FaPlus, FaEdit, FaTrash } from "react-icons/fa";
+import { FaUsers, FaPlus, FaEdit, FaTrash, FaMoneyBillWave } from "react-icons/fa";
 import { useSelector } from "react-redux";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const limit = 20;
+
+/* ===========================
+   Default Price List (fixed sizes)
+=========================== */
+const DEFAULT_PRICE_LIST = [
+  { size: "1030 × 820 mm", price: 0 },
+  { size: "1030 × 770 mm", price: 0 },
+  { size: "745 × 605 mm", price: 0 },
+  { size: "724 × 615 mm", price: 0 },
+  { size: "650 × 550 mm", price: 0 },
+  { size: "645 × 510 mm", price: 0 },
+  { size: "510 × 400 mm", price: 0 },
+  { size: "450 × 370 mm", price: 0 },
+];
+
+const emptyPriceList = () =>
+  DEFAULT_PRICE_LIST.map((item) => ({ ...item }));
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -17,12 +34,15 @@ const Customers = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [priceEditingId, setPriceEditingId] = useState(null);
 
   const [form, setForm] = useState({
     fullname: "",
     phoneNumber: "",
     isActive: true,
+    priceList: emptyPriceList(),
   });
 
   /* ======================
@@ -49,6 +69,9 @@ const Customers = () => {
     fetchCustomers(currentPage);
   }, [currentPage]);
 
+  /* ======================
+     Submit (Create / Update)
+  ====================== */
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
@@ -71,9 +94,29 @@ const Customers = () => {
     }
   };
 
+  /* ======================
+     Submit Price List Only
+  ====================== */
+  const handlePriceSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting || !priceEditingId) return;
+
+    try {
+      setSubmitting(true);
+      await axios.patch(`${BASE_URL}/customers/${priceEditingId}`, {
+        priceList: form.priceList,
+      });
+      resetPriceForm();
+      fetchCustomers(currentPage);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   /* ======================
-     Edit
+     Edit Customer
   ====================== */
   const handleEdit = (customer) => {
     setEditingId(customer.id);
@@ -81,8 +124,33 @@ const Customers = () => {
       fullname: customer.fullname,
       phoneNumber: customer.phoneNumber,
       isActive: customer.isActive,
+      priceList:
+        Array.isArray(customer.priceList) && customer.priceList.length
+          ? customer.priceList.map((p) => ({
+              size: p.size,
+              price: Number(p.price) || 0,
+            }))
+          : emptyPriceList(),
     });
     setIsModalOpen(true);
+  };
+
+  /* ======================
+     Edit Price List Only
+  ====================== */
+  const handleEditPrice = (customer) => {
+    setPriceEditingId(customer.id);
+    setForm((prev) => ({
+      ...prev,
+      priceList:
+        Array.isArray(customer.priceList) && customer.priceList.length
+          ? customer.priceList.map((p) => ({
+              size: p.size,
+              price: Number(p.price) || 0,
+            }))
+          : emptyPriceList(),
+    }));
+    setIsPriceModalOpen(true);
   };
 
   /* ======================
@@ -100,12 +168,37 @@ const Customers = () => {
   };
 
   /* ======================
-     Reset
+     Reset Forms
   ====================== */
   const resetForm = () => {
-    setForm({ fullname: "", phoneNumber: "", isActive: true });
+    setForm({
+      fullname: "",
+      phoneNumber: "",
+      isActive: true,
+      priceList: emptyPriceList(),
+    });
     setEditingId(null);
     setIsModalOpen(false);
+  };
+
+  const resetPriceForm = () => {
+    setForm((prev) => ({
+      ...prev,
+      priceList: emptyPriceList(),
+    }));
+    setPriceEditingId(null);
+    setIsPriceModalOpen(false);
+  };
+
+  /* ======================
+     Handle Price Change
+  ====================== */
+  const handlePriceChange = (index, value) => {
+    setForm((prev) => {
+      const updated = [...prev.priceList];
+      updated[index] = { ...updated[index], price: Number(value) || 0 };
+      return { ...prev, priceList: updated };
+    });
   };
 
   return (
@@ -171,31 +264,48 @@ const Customers = () => {
                   </td>
                 </tr>
               ) : customers.length ? (
-                customers.map((c, index) => (
+                customers.map((c) => (
                   <tr
                     key={c.id}
                     className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => setSelectedCustomer(c)} // <-- select customer
+                    onClick={() => setSelectedCustomer(c)}
                   >
-                    <td className="border px-4 py-2">
-                      {c.id}
-                    </td>
+                    <td className="border px-4 py-2">{c.id}</td>
                     <td className="border px-4 py-2">{c.fullname}</td>
                     <td className="border px-4 py-2">{c.phoneNumber}</td>
-                    <td className="border px-4 py-2">{c.isActive ? "فعال" : "غیرفعال"}</td>
                     <td className="border px-4 py-2">
-                     {currentUser.role=="admin"?( <div className="flex justify-center gap-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
-                          className="h-8 w-8 flex items-center justify-center border border-cyan-800 rounded-md hover:scale-105"
-                        >
-                          <FaEdit className="text-cyan-800" />
-                        </button>
-                      </div>):"--"}
+                      {c.isActive ? "فعال" : "غیرفعال"}
+                    </td>
+                    <td className="border px-4 py-2">
+                      {currentUser.role === "admin" ? (
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(c);
+                            }}
+                            className="h-8 w-8 flex items-center justify-center border border-cyan-800 rounded-md hover:scale-105"
+                            title="ویرایش مشتری"
+                          >
+                            <FaEdit className="text-cyan-800" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditPrice(c);
+                            }}
+                            className="h-8 w-8 flex items-center justify-center border border-green-700 rounded-md hover:scale-105"
+                            title="ویرایش لیست قیمت"
+                          >
+                            <FaMoneyBillWave className="text-green-700" />
+                          </button>
+                        </div>
+                      ) : (
+                        "--"
+                      )}
                     </td>
                   </tr>
                 ))
-
               ) : (
                 <tr>
                   <td colSpan="5" className="py-4 text-gray-500">
@@ -214,12 +324,12 @@ const Customers = () => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Customer Modal (Create / Edit) */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <form
             onSubmit={handleSubmit}
-            className="bg-white p-6 rounded-lg w-[400px]"
+            className="bg-white p-6 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto"
           >
             <h3 className="text-lg font-bold mb-4">
               {editingId ? "ویرایش مشتری" : "افزودن مشتری"}
@@ -255,6 +365,39 @@ const Customers = () => {
               فعال
             </label>
 
+            {/* Price List */}
+            <div className="border rounded-lg p-4 mb-4 bg-gray-50">
+              <div className="flex items-center gap-2 mb-3">
+                <FaMoneyBillWave className="text-green-700" />
+                <h4 className="font-semibold text-gray-800">
+                  لیست قیمت (اندازه‌ها)
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {form.priceList.map((item, index) => (
+                  <div
+                    key={item.size}
+                    className="flex items-center justify-between gap-2 border rounded p-2 bg-white"
+                  >
+                    <span className="text-sm text-gray-700 whitespace-nowrap">
+                      {item.size}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={item.price}
+                      onChange={(e) =>
+                        handlePriceChange(index, e.target.value)
+                      }
+                      className="w-24 border p-1 rounded text-center"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -266,25 +409,75 @@ const Customers = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="
-    px-4 py-2 bg-cyan-800 text-white rounded
-    flex items-center justify-center gap-2
-    disabled:opacity-60 disabled:cursor-not-allowed
-  "
+                className="px-4 py-2 bg-cyan-800 text-white rounded flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {submitting ? "در حال ذخیره..." : "ذخیره"}
               </button>
-
             </div>
           </form>
         </div>
       )}
+
+      {/* Price List Modal (Edit only) */}
+      {isPriceModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <form
+            onSubmit={handlePriceSubmit}
+            className="bg-white p-6 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <FaMoneyBillWave className="text-green-700" />
+              ویرایش لیست قیمت مشتری #{priceEditingId}
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              {form.priceList.map((item, index) => (
+                <div
+                  key={item.size}
+                  className="flex items-center justify-between gap-2 border rounded p-2 bg-gray-50"
+                >
+                  <span className="text-sm text-gray-700 whitespace-nowrap">
+                    {item.size}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={item.price}
+                    onChange={(e) =>
+                      handlePriceChange(index, e.target.value)
+                    }
+                    className="w-24 border p-1 rounded text-center bg-white"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={resetPriceForm}
+                className="px-4 py-2 border rounded"
+              >
+                لغو
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 py-2 bg-green-700 text-white rounded flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {submitting ? "در حال ذخیره..." : "ذخیره"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {selectedCustomer && (
         <div className="mt-8">
           <RemainOrderItems customer={selectedCustomer} />
         </div>
       )}
-
     </div>
   );
 };

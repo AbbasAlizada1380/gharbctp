@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { FaPlus, FaSpinner, FaTrash, FaUpload, FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import { useSelector } from "react-redux";
 import OrderItemsList from "./OrderItemsList.jsx";
 import sizes from "../services/Size.js";
 
@@ -12,15 +13,13 @@ const createEmptyOrderItems = (count = 5) => {
   return Array.from({ length: count }, () => ({
     size: "",
     qnty: "",
-    price: "",
-    money: "",
     fileName: "",
-    invoiceNumber: "",
     customer: "",
   }));
 };
 
 const OrdersWithCustomerPerItem = () => {
+  const { currentUser } = useSelector((state) => state.user);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -49,16 +48,11 @@ const OrdersWithCustomerPerItem = () => {
     fetchCustomers();
   }, []);
 
-  // Handle field changes
+  // Handle field changes (no more price / money auto-calc)
   const handleItemChange = (index, name, value) => {
     setOrderItems((prev) => {
       const updated = [...prev];
       updated[index][name] = value;
-      if (name === "qnty" || name === "price") {
-        const qnty = Number(updated[index].qnty) || 0;
-        const price = Number(updated[index].price) || 0;
-        updated[index].money = qnty * price;
-      }
       return updated;
     });
   };
@@ -67,7 +61,7 @@ const OrdersWithCustomerPerItem = () => {
   const addOrderItem = () => {
     setOrderItems((prev) => [
       ...prev,
-      { size: "", qnty: "", price: "", money: "", fileName: "", invoiceNumber: "", customer: "" },
+      { size: "", qnty: "", fileName: "", customer: "" },
     ]);
   };
 
@@ -86,12 +80,13 @@ const OrdersWithCustomerPerItem = () => {
     const parsedItems = lines
       .map((line) => {
         let parts = line.split("\t").map((s) => s.trim());
-        if (parts.length < 5) parts = line.split(/\s{2,}/).map((s) => s.trim());
-        if (parts.length < 5) {
+        if (parts.length < 4) parts = line.split(/\s{2,}/).map((s) => s.trim());
+        if (parts.length < 4) {
           console.warn("Skipping line – not enough columns:", line);
           return null;
         }
-        const [size, fileName, qnty, invoiceNumber, customerName] = parts;
+        // Columns: size | fileName | qnty | customerName
+        const [size, fileName, qnty, customerName] = parts;
         const foundCustomer = customers.find(
           (c) => c.fullname.trim().toLowerCase() === customerName.toLowerCase()
         );
@@ -103,10 +98,7 @@ const OrdersWithCustomerPerItem = () => {
           size,
           fileName,
           qnty,
-          invoiceNumber,
           customer: foundCustomer.id,
-          price: "",
-          money: "",
         };
       })
       .filter((item) => item !== null);
@@ -142,10 +134,8 @@ const OrdersWithCustomerPerItem = () => {
           return;
         }
 
-        // Get headers from the first row (keys of the first object)
         const headers = Object.keys(jsonData[0]);
 
-        // Find column indices by header names (case‑insensitive, trimmed)
         const findColumn = (possibleNames) => {
           for (const name of possibleNames) {
             const idx = headers.findIndex(
@@ -159,31 +149,24 @@ const OrdersWithCustomerPerItem = () => {
         const sizeCol = findColumn(["سایز", "size"]);
         const fileCol = findColumn(["نام فایل", "fileName", "file name"]);
         const qntyCol = findColumn(["تعداد", "quantity", "qnty"]);
-        const invoiceCol = findColumn(["نمبر بیل", "invoiceNumber", "invoice"]);
         const customerCol = findColumn(["مشتری", "customer", "customerName"]);
 
-        // If any required column is missing, alert
         if ([sizeCol, fileCol, qntyCol, customerCol].includes(-1)) {
           alert(
             "ستون‌های مورد نیاز یافت نشدند. لطفاً از ستون‌های زیر استفاده کنید:\n" +
-            "سایز, نام فایل, تعداد, مشتری (نمبر بیل اختیاری)"
+            "سایز, نام فایل, تعداد, مشتری"
           );
           setUploadingFile(false);
           return;
         }
 
-        // Map rows to order items
         const parsedItems = [];
         for (const row of jsonData) {
           const size = row[headers[sizeCol]]?.toString().trim() || "";
           const fileName = row[headers[fileCol]]?.toString().trim() || "";
           const qnty = row[headers[qntyCol]]?.toString().trim() || "";
-          const invoiceNumber = invoiceCol !== -1
-            ? row[headers[invoiceCol]]?.toString().trim() || ""
-            : "";
           const customerName = row[headers[customerCol]]?.toString().trim() || "";
 
-          // Skip rows where size, fileName, qnty, or customer is empty
           if (!size && !fileName && !qnty) continue;
           if (!customerName) {
             alert(`مشتری در ردیف "${size} ${fileName}" مشخص نشده است.`);
@@ -202,10 +185,7 @@ const OrdersWithCustomerPerItem = () => {
             size,
             fileName,
             qnty,
-            invoiceNumber,
             customer: foundCustomer.id,
-            price: "",
-            money: "",
           });
         }
 
@@ -222,7 +202,7 @@ const OrdersWithCustomerPerItem = () => {
         alert("خطا در خواندن فایل اکسل. لطفاً فرمت فایل را بررسی کنید.");
       } finally {
         setUploadingFile(false);
-        event.target.value = ""; // reset file input
+        event.target.value = "";
       }
     };
     reader.readAsArrayBuffer(file);
@@ -233,11 +213,16 @@ const OrdersWithCustomerPerItem = () => {
     e.preventDefault();
     if (submitting) return;
 
+    // 🔒 Make sure we have a logged-in user
+    if (!currentUser || !currentUser.id) {
+      alert("لطفا دوباره وارد شوید");
+      return;
+    }
+
     const nonEmptyItems = orderItems.filter(
       (item) =>
         (item.size.trim() !== "" ||
           item.qnty !== "" ||
-          item.price !== "" ||
           item.fileName.trim() !== "") &&
         item.customer !== ""
     );
@@ -263,14 +248,14 @@ const OrdersWithCustomerPerItem = () => {
       const item = nonEmptyItems[i];
       const payload = {
         customer: item.customer,
+        userId: currentUser.id,
         orderItems: [
           {
             size: item.size,
             qnty: Number(item.qnty) || 0,
-            price: Number(item.price) || 0,
-            money: Number(item.money) || 0,
             fileName: item.fileName,
-            invoiceNumber: item.invoiceNumber || "",
+            // 👇 price, money, invoiceNumber removed — the backend
+            //    resolves the price from the customer's priceList
           },
         ],
       };
@@ -300,7 +285,7 @@ const OrdersWithCustomerPerItem = () => {
   };
 
   const filledCount = orderItems.filter(
-    (item) => item.size || item.qnty || item.price || item.fileName
+    (item) => item.size || item.qnty || item.fileName
   ).length;
 
   return (
@@ -323,7 +308,6 @@ const OrdersWithCustomerPerItem = () => {
 
           {showBulkInput && (
             <div className="mt-3 space-y-4">
-              {/* Textarea import */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   چسباندن متن (با تب یا دو فاصله)
@@ -332,9 +316,9 @@ const OrdersWithCustomerPerItem = () => {
                   rows="6"
                   value={bulkText}
                   onChange={(e) => setBulkText(e.target.value)}
-                  placeholder={`سایز\tنام فایل\tتعداد\tنمبر بیل\tمشتری
-645 × 510 mm\t-\t1\t-\tپرچون
-510 × 400 mm\tبیسکویت گل سیب\t4\t-\tاکبر`}
+                  placeholder={`سایز\tنام فایل\tتعداد\tمشتری
+645 × 510 mm\t-\t1\tپرچون
+510 × 400 mm\tبیسکویت گل سیب\t4\tاکبر`}
                   className="w-full border rounded-md px-3 py-2 font-mono text-sm"
                   dir="ltr"
                 />
@@ -358,7 +342,6 @@ const OrdersWithCustomerPerItem = () => {
 
               <div className="border-t border-gray-300 my-2"></div>
 
-              {/* Excel file upload */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   بارگذاری فایل اکسل (.xlsx, .xls)
@@ -379,7 +362,7 @@ const OrdersWithCustomerPerItem = () => {
                     <FaSpinner className="animate-spin text-blue-600 text-xl" />
                   )}
                   <span className="text-sm text-gray-500">
-                    ستون‌ها باید شامل عناوین: سایز، نام فایل، تعداد، مشتری (نمبر بیل اختیاری)
+                    ستون‌ها باید شامل عناوین: سایز، نام فایل، تعداد، مشتری
                   </span>
                 </div>
               </div>
@@ -391,8 +374,7 @@ const OrdersWithCustomerPerItem = () => {
         <div className="space-y-4">
           {orderItems.map((item, index) => (
             <div key={index} className="p-4 border rounded-md relative bg-white border-gray-300">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-                {/* Customer */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block mb-1 text-sm font-medium">مشتری</label>
                   <select
@@ -410,19 +392,6 @@ const OrdersWithCustomerPerItem = () => {
                   </select>
                 </div>
 
-                {/* Invoice Number */}
-                <div>
-                  <label className="block mb-1 text-sm font-medium">نمبر بیل</label>
-                  <input
-                    type="text"
-                    value={item.invoiceNumber}
-                    onChange={(e) => handleItemChange(index, "invoiceNumber", e.target.value)}
-                    className="w-full border rounded-md px-3 py-2"
-                    placeholder="000"
-                  />
-                </div>
-
-                {/* File Name */}
                 <div>
                   <label className="block mb-1 text-sm font-medium">نام فایل</label>
                   <input
@@ -434,7 +403,6 @@ const OrdersWithCustomerPerItem = () => {
                   />
                 </div>
 
-                {/* Size */}
                 <div>
                   <label className="block mb-1 text-sm font-medium">سایز</label>
                   <select
@@ -451,7 +419,6 @@ const OrdersWithCustomerPerItem = () => {
                   </select>
                 </div>
 
-                {/* Quantity */}
                 <div>
                   <label className="block mb-1 text-sm font-medium">تعداد</label>
                   <input
@@ -461,32 +428,6 @@ const OrdersWithCustomerPerItem = () => {
                     onChange={(e) => handleItemChange(index, "qnty", e.target.value)}
                     className="w-full border rounded-md px-3 py-2"
                     placeholder="0"
-                  />
-                </div>
-
-                {/* Price */}
-                <div>
-                  <label className="block mb-1 text-sm font-medium">قیمت</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={item.price}
-                    onChange={(e) => handleItemChange(index, "price", e.target.value)}
-                    className="w-full border rounded-md px-3 py-2"
-                    placeholder="0"
-                  />
-                </div>
-
-                {/* Money */}
-                <div>
-                  <label className="block mb-1 text-sm font-medium">مجموع مبلغ</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={item.money || ""}
-                    className="w-full border rounded-md px-3 py-2 bg-gray-50"
-                    placeholder="0"
-                    readOnly
                   />
                 </div>
               </div>

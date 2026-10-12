@@ -11,7 +11,7 @@ const AddUser = () => {
     confirmPassword: "",
     role: "",
   });
-  const [roles] = useState([{ id: 1, name: "reception" }, { id: 2, name: "FinancialManager" }]);
+  const [roles] = useState([{ id: 1, name: "designer" }, { id: 2, name: "FinancialManager" }]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");

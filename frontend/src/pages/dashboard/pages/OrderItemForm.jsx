@@ -1,37 +1,57 @@
 import React from "react";
-import { FaTrash } from "react-icons/fa";
+import { FaTrash, FaMoneyBillWave } from "react-icons/fa";
 import sizes from "../services/Size.js";
 
-const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDelete }) => {
+const OrderItemForm = ({
+  item,
+  index,
+  handleItemChange,
+  deleteOrderItem,
+  canDelete,
+  selectedCustomer, // 👈 pass the currently selected customer (optional)
+}) => {
   // Check if item is completely empty
-  const isEmpty = !item.size && !item.qnty && !item.price && !item.fileName;
+  const isEmpty = !item.size && !item.qnty && !item.fileName;
+
+  // 🔹 Resolve the price from the customer's priceList for the chosen size
+  const resolvePrice = () => {
+    if (!selectedCustomer || !item.size) return null;
+    if (!Array.isArray(selectedCustomer.priceList)) return null;
+
+    const normalized = item.size.trim().replace(/\s+/g, " ");
+    const entry = selectedCustomer.priceList.find(
+      (p) => (p.size || "").trim().replace(/\s+/g, " ") === normalized
+    );
+    return entry ? Number(entry.price) || 0 : null;
+  };
+
+  const priceFromList = resolvePrice();
+  const totalMoney =
+    priceFromList !== null && item.qnty
+      ? priceFromList * Number(item.qnty)
+      : null;
 
   return (
-    <div className={`p-4 border rounded-md relative ${isEmpty ? 'bg-gray-50 border-dashed border-gray-300' : 'bg-white border-gray-300'}`}>
-
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-
-        {/* invoice number */}
-        {/* <div>
-          <label className="block mb-1 text-sm font-medium">نمبر بیل</label>
-          <input
-            type="text"
-            value={item.invoiceNumber}
-            onChange={(e) => handleItemChange(index, "invoiceNumber", e.target.value)}
-            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
-            placeholder="000"
-          />
-        </div> */}
-
+    <div
+      className={`p-4 border rounded-md relative ${
+        isEmpty
+          ? "bg-gray-50 border-dashed border-gray-300"
+          : "bg-white border-gray-300"
+      }`}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* File Name */}
         <div>
           <label className="block mb-1 text-sm font-medium">نام فایل</label>
           <input
             type="text"
             value={item.fileName}
-            onChange={(e) => handleItemChange(index, "fileName", e.target.value)}
-            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
+            onChange={(e) =>
+              handleItemChange(index, "fileName", e.target.value)
+            }
+            className={`w-full border rounded-md px-3 py-2 ${
+              isEmpty ? "border-dashed" : ""
+            }`}
             placeholder="example.pdf"
           />
         </div>
@@ -42,7 +62,9 @@ const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDele
           <select
             value={item.size}
             onChange={(e) => handleItemChange(index, "size", e.target.value)}
-            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
+            className={`w-full border rounded-md px-3 py-2 ${
+              isEmpty ? "border-dashed" : ""
+            }`}
           >
             <option value="">انتخاب سایز</option>
             {sizes.map((s) => (
@@ -61,40 +83,50 @@ const OrderItemForm = ({ item, index, handleItemChange, deleteOrderItem, canDele
             min="1"
             value={item.qnty}
             onChange={(e) => handleItemChange(index, "qnty", e.target.value)}
-            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
+            className={`w-full border rounded-md px-3 py-2 ${
+              isEmpty ? "border-dashed" : ""
+            }`}
             placeholder="0"
           />
         </div>
 
-
-        {/* Price */}
-        <div>
-          <label className="block mb-1 text-sm font-medium">قیمت</label>
+        {/* Price (read-only, resolved from customer's price list) */}
+        {/* <div>
+          <label className="block mb-1 text-sm font-medium flex items-center gap-1">
+            <FaMoneyBillWave className="text-green-700" />
+            قیمت (از لیست مشتری)
+          </label>
           <input
-            type="number"
-            min="0"
-            value={item.price}
-            onChange={(e) => handleItemChange(index, "price", e.target.value)}
-            className={`w-full border rounded-md px-3 py-2 ${isEmpty ? 'border-dashed' : ''}`}
-            placeholder="0"
+            type="text"
+            value={
+              priceFromList === null
+                ? item.size
+                  ? "قیمت تعیین نشده"
+                  : "—"
+                : priceFromList.toLocaleString("en-US")
+            }
+            readOnly
+            className={`w-full border rounded-md px-3 py-2 bg-gray-50 text-center font-semibold ${
+              priceFromList === null && item.size
+                ? "text-red-600"
+                : "text-green-700"
+            } ${isEmpty ? "border-dashed" : ""}`}
+            placeholder="—"
           />
-        </div>
-
-        {/* Money */}
-        <div>
-          <label className="block mb-1 text-sm font-medium">مجموع مبلغ</label>
-          <input
-            type="number"
-            min="0"
-            onChange={(e) => handleItemChange(index, "money", e.target.value)}
-            value={item.money || ""}
-            className="w-full border rounded-md px-3 py-2 bg-gray-50"
-            placeholder="0"
-          />
-        </div>
+        </div> */}
       </div>
 
-      {/* Delete Button - Only show if canDelete (more than 5 items) */}
+      {/* Total Preview (only shown if price is available and qty entered) */}
+      {totalMoney !== null && (
+        <div className="mt-3 flex items-center justify-end gap-2 text-sm">
+          <span className="text-gray-600">مجموع:</span>
+          <span className="font-bold text-purple-700">
+            {totalMoney.toLocaleString("en-US")} افغانی
+          </span>
+        </div>
+      )}
+
+      {/* Delete Button */}
       {canDelete && (
         <button
           type="button"

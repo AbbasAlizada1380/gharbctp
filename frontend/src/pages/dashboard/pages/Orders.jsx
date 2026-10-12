@@ -3,6 +3,7 @@ import axios from "axios";
 import { FaPlus } from "react-icons/fa";
 import OrderItemForm from "./OrderItemForm";
 import OrderItemsList from "./OrderItemsList";
+import { useSelector } from "react-redux";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -14,15 +15,16 @@ const createEmptyOrderItems = (count = 5) => {
     price: "",
     money: "",
     fileName: "",
-    invoiceNumber:""
+    invoiceNumber: "",
   }));
 };
 
 const Orders = () => {
+  const { currentUser } = useSelector((state) => state.user);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [addingCustomer, setAddingCustomer] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // Add this state
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     customer: "",
@@ -84,7 +86,7 @@ const Orders = () => {
       ...prev,
       orderItems: [
         ...prev.orderItems,
-        { size: "", qnty: "", price: "", money: "", fileName: "" },
+        { size: "", qnty: "", price: "", money: "", fileName: "", invoiceNumber: "" },
       ],
     }));
   };
@@ -103,15 +105,21 @@ const Orders = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // ⛔ اگر قبلاً کلیک شده، هیچ کاری نکن
     if (submitting) return;
 
+    // 🔒 Make sure we have a logged-in user
+    if (!currentUser || !currentUser.id) {
+      alert("لطفا دوباره وارد شوید");
+      return;
+    }
+
     // Filter out empty items
-    const nonEmptyOrderItems = form.orderItems.filter(item =>
-      item.size.trim() !== "" ||
-      item.qnty !== "" ||
-      item.price !== "" ||
-      item.fileName.trim() !== ""
+    const nonEmptyOrderItems = form.orderItems.filter(
+      (item) =>
+        item.size.trim() !== "" ||
+        item.qnty !== "" ||
+        item.price !== "" ||
+        item.fileName.trim() !== ""
     );
 
     if (nonEmptyOrderItems.length === 0) {
@@ -123,10 +131,11 @@ const Orders = () => {
       ...form,
       orderItems: nonEmptyOrderItems,
       customer: addingCustomer ? undefined : form.customer,
+      userId: currentUser.id, // ✅ send the current user's id
     };
 
     try {
-      setSubmitting(true); // 🔒 قفل دکمه
+      setSubmitting(true);
 
       await axios.post(`${BASE_URL}/orderItems`, payload);
 
@@ -139,16 +148,14 @@ const Orders = () => {
       });
 
       setAddingCustomer(false);
-      setRefreshTrigger(prev => prev + 1);
-
+      setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
       console.error(err);
       alert("خطا در ثبت سفارش");
     } finally {
-      setSubmitting(false); // 🔓 آزاد شدن (اگر خواستی)
+      setSubmitting(false);
     }
   };
-
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -233,30 +240,30 @@ const Orders = () => {
           onClick={handleSubmit}
           disabled={submitting}
           className={`
-    w-full py-3 rounded-md transition
-    ${submitting
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-cyan-800 text-white hover:bg-cyan-900"}
-  `}
+            w-full py-3 rounded-md transition
+            ${
+              submitting
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-cyan-800 text-white hover:bg-cyan-900"
+            }
+          `}
         >
           {submitting
             ? "در حال ثبت سفارش..."
-            : `ثبت سفارش (${form.orderItems.filter(
-              item => item.size || item.qnty || item.price || item.fileName
-            ).length} مورد پر شده)`
-          }
+            : `ثبت سفارش (${
+                form.orderItems.filter(
+                  (item) =>
+                    item.size || item.qnty || item.price || item.fileName
+                ).length
+              } مورد پر شده)`}
         </button>
-
       </div>
 
-      {/* Pass the refreshTrigger prop */}
-      <div className="mt-4"> <OrderItemsList refreshTrigger={refreshTrigger} /></div>
+      <div className="mt-4">
+        <OrderItemsList refreshTrigger={refreshTrigger} />
+      </div>
     </div>
   );
 };
 
 export default Orders;
-
-
-
-
