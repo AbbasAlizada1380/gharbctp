@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaPlus, FaSpinner, FaTrash, FaUpload, FaFileExcel } from "react-icons/fa";
+import {
+  FaPlus,
+  FaSpinner,
+  FaTrash,
+  FaUpload,
+  FaFileExcel,
+  FaPrint,
+} from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { useSelector } from "react-redux";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import moment from "moment-jalaali";
 import OrderItemsList from "./OrderItemsList.jsx";
 import sizes from "../services/Size.js";
+// Reuse the same font file used by SelectedOrderItemsDownload
+import VazirmatnTTF from "../../../../public/ttf/Vazirmatn.js";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -16,6 +28,136 @@ const createEmptyOrderItems = (count = 5) => {
     fileName: "",
     customer: "",
   }));
+};
+
+/* ============================================================
+   PDF generator for the submitted bill — same style as
+   SelectedOrderItemsDownload.generateOrderItemsPdf
+   BUT opens the print dialog directly (no download)
+============================================================ */
+const printBillPdf = (billItems, currentUser) => {
+  if (!billItems || billItems.length === 0) {
+    alert("هیچ سفارشی برای چاپ وجود ندارد");
+    return;
+  }
+
+  const PAGE_WIDTH_CM = 8;
+  const PAGE_WIDTH_PT = PAGE_WIDTH_CM * 28.3465;
+  const PAGE_HEIGHT_PT = 800;
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "pt",
+    format: [PAGE_WIDTH_PT, PAGE_HEIGHT_PT],
+  });
+
+  doc.setR2L(false);
+
+  doc.addFileToVFS("Vazirmatn.ttf", VazirmatnTTF);
+  doc.addFont("Vazirmatn.ttf", "Vazirmatn", "normal");
+  doc.setFont("Vazirmatn");
+
+  const MARGIN = 6;
+  const CONTENT_WIDTH = PAGE_WIDTH_PT - MARGIN * 2;
+
+  /* Header */
+  const TOP_Y = 30;
+  doc.setFontSize(8);
+  doc.setTextColor(20);
+
+  const todayDate = moment().format("jYYYY/jMM/jDD");
+  const userName =
+    currentUser?.username ||
+    currentUser?.fullname ||
+    currentUser?.name ||
+    "—";
+
+  doc.text(`تاریخ: ${todayDate}`, MARGIN, TOP_Y, { align: "left" });
+  doc.text(`کاربر: ${userName}`, PAGE_WIDTH_PT - MARGIN, TOP_Y, {
+    align: "right",
+  });
+
+  let cursorY = TOP_Y + 14;
+
+  /* Table */
+  const headers = [["تعداد", "سایز", "نام فایل", "شماره"]];
+
+  const body = billItems.map((item, idx) => {
+    const id = item.invoiceNumber ?? item.id ?? idx + 1;
+    const customer = item.customerName || "—";
+    return [
+      item.qnty ?? "—",
+      item.size ?? "—",
+      item.fileName || "—",
+      `${id}\n${customer}`,
+    ];
+  });
+
+  autoTable(doc, {
+    startY: cursorY,
+    margin: { left: MARGIN, right: MARGIN },
+    head: headers,
+    body: body,
+    tableWidth: CONTENT_WIDTH,
+    theme: "grid",
+    styles: {
+      font: "Vazirmatn",
+      fontSize: 8,
+      cellPadding: 3,
+      halign: "center",
+      valign: "middle",
+      overflow: "linebreak",
+      lineHeight: 1.15,
+    },
+    headStyles: {
+      font: "Vazirmatn",
+      fontStyle: "normal",
+      fillColor: [220, 220, 220],
+      textColor: 20,
+      halign: "center",
+      fontSize: 8,
+    },
+    columnStyles: {
+      0: { cellWidth: 30 },
+      1: { cellWidth: 55 },
+      2: { cellWidth: "auto" },
+      3: { cellWidth: 40 },
+    },
+    didParseCell: (data) => {
+      if (data.section === "body" && data.column.index === 3) {
+        const [id, customer] = String(data.cell.raw).split("\n");
+        data.cell.text = [];
+        data.cell._idLine = id || "";
+        data.cell._customerLine = customer || "";
+      }
+    },
+    didDrawCell: (data) => {
+      if (data.section === "body" && data.column.index === 3) {
+        const id = data.cell._idLine || "";
+        const customer = data.cell._customerLine || "";
+        const centerX = data.cell.x + data.cell.width / 2;
+
+        doc.setFont("Vazirmatn", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(20);
+        doc.text(id, centerX, data.cell.y + 9, { align: "center" });
+
+        doc.setFont("Vazirmatn", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(110);
+        doc.text(customer, centerX, data.cell.y + 18, { align: "center" });
+      }
+    },
+  });
+
+  /* ====== Open print dialog directly instead of downloading ====== */
+  doc.autoPrint();
+  const blobUrl = doc.output("bloburl");
+
+  const printWindow = window.open(blobUrl, "_blank");
+  if (!printWindow) {
+    alert("لطفاً اجازه باز شدن پنجره پاپ‌آپ را بدهید تا فاکتور چاپ شود.");
+  }
 };
 
 const OrdersWithCustomerPerItem = () => {
@@ -31,6 +173,9 @@ const OrdersWithCustomerPerItem = () => {
   const [showBulkInput, setShowBulkInput] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
+
+  // Last submitted bill (for re-printing)
+  const [lastBillItems, setLastBillItems] = useState(null);
 
   // Fetch customers
   useEffect(() => {
@@ -48,7 +193,7 @@ const OrdersWithCustomerPerItem = () => {
     fetchCustomers();
   }, []);
 
-  // Handle field changes (no more price / money auto-calc)
+  // Handle field changes
   const handleItemChange = (index, name, value) => {
     setOrderItems((prev) => {
       const updated = [...prev];
@@ -85,7 +230,6 @@ const OrdersWithCustomerPerItem = () => {
           console.warn("Skipping line – not enough columns:", line);
           return null;
         }
-        // Columns: size | fileName | qnty | customerName
         const [size, fileName, qnty, customerName] = parts;
         const foundCustomer = customers.find(
           (c) => c.fullname.trim().toLowerCase() === customerName.toLowerCase()
@@ -154,7 +298,7 @@ const OrdersWithCustomerPerItem = () => {
         if ([sizeCol, fileCol, qntyCol, customerCol].includes(-1)) {
           alert(
             "ستون‌های مورد نیاز یافت نشدند. لطفاً از ستون‌های زیر استفاده کنید:\n" +
-            "سایز, نام فایل, تعداد, مشتری"
+              "سایز, نام فایل, تعداد, مشتری"
           );
           setUploadingFile(false);
           return;
@@ -213,7 +357,6 @@ const OrdersWithCustomerPerItem = () => {
     e.preventDefault();
     if (submitting) return;
 
-    // 🔒 Make sure we have a logged-in user
     if (!currentUser || !currentUser.id) {
       alert("لطفا دوباره وارد شوید");
       return;
@@ -244,8 +387,16 @@ const OrdersWithCustomerPerItem = () => {
     let successCount = 0;
     let errorCount = 0;
 
+    // Collect submitted items to build the bill
+    const billItems = [];
+
     for (let i = 0; i < nonEmptyItems.length; i++) {
       const item = nonEmptyItems[i];
+
+      const customerObj = customers.find(
+        (c) => String(c.id) === String(item.customer)
+      );
+
       const payload = {
         customer: item.customer,
         userId: currentUser.id,
@@ -254,14 +405,40 @@ const OrdersWithCustomerPerItem = () => {
             size: item.size,
             qnty: Number(item.qnty) || 0,
             fileName: item.fileName,
-            // 👇 price, money, invoiceNumber removed — the backend
-            //    resolves the price from the customer's priceList
           },
         ],
       };
 
       try {
-        await axios.post(`${BASE_URL}/orderItems`, payload);
+        const res = await axios.post(`${BASE_URL}/orderItems`, payload);
+
+        const responseOrder =
+          res.data?.order ||
+          res.data?.orderItem ||
+          res.data?.createdOrder ||
+          res.data;
+
+        billItems.push({
+          id: responseOrder?.id ?? null,
+          invoiceNumber:
+            responseOrder?.invoiceNumber ??
+            responseOrder?.orderItems?.[0]?.invoiceNumber ??
+            null,
+          customerName: customerObj?.fullname || "—",
+          customerPhone: customerObj?.phoneNumber || "",
+          size: item.size,
+          fileName: item.fileName,
+          qnty: Number(item.qnty) || 0,
+          price:
+            responseOrder?.orderItems?.[0]?.price ??
+            responseOrder?.price ??
+            null,
+          total:
+            responseOrder?.orderItems?.[0]?.total ??
+            responseOrder?.total ??
+            null,
+        });
+
         successCount++;
       } catch (err) {
         console.error(`Error submitting item ${i + 1}:`, err);
@@ -275,10 +452,21 @@ const OrdersWithCustomerPerItem = () => {
 
     if (errorCount === 0) {
       alert(`✅ همه ${successCount} سفارش با موفقیت ثبت شدند.`);
+
+      // Store bill items so the user can re-print later if they wish
+      setLastBillItems(billItems);
+
+      // Open print page directly (no download)
+      printBillPdf(billItems, currentUser);
+
       setOrderItems(createEmptyOrderItems(5));
       setRefreshTrigger((prev) => prev + 1);
     } else {
       alert(`⚠️ ${successCount} سفارش ثبت شد، ${errorCount} مورد با خطا مواجه شد.`);
+      if (billItems.length > 0) {
+        setLastBillItems(billItems);
+        printBillPdf(billItems, currentUser);
+      }
     }
 
     setSubmitProgress({ current: 0, total: 0 });
@@ -373,13 +561,18 @@ const OrdersWithCustomerPerItem = () => {
         {/* Order Items */}
         <div className="space-y-4">
           {orderItems.map((item, index) => (
-            <div key={index} className="p-4 border rounded-md relative bg-white border-gray-300">
+            <div
+              key={index}
+              className="p-4 border rounded-md relative bg-white border-gray-300"
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block mb-1 text-sm font-medium">مشتری</label>
                   <select
                     value={item.customer}
-                    onChange={(e) => handleItemChange(index, "customer", e.target.value)}
+                    onChange={(e) =>
+                      handleItemChange(index, "customer", e.target.value)
+                    }
                     className="w-full border rounded-md px-3 py-2"
                     required
                   >
@@ -397,7 +590,9 @@ const OrdersWithCustomerPerItem = () => {
                   <input
                     type="text"
                     value={item.fileName}
-                    onChange={(e) => handleItemChange(index, "fileName", e.target.value)}
+                    onChange={(e) =>
+                      handleItemChange(index, "fileName", e.target.value)
+                    }
                     className="w-full border rounded-md px-3 py-2"
                     placeholder="example.pdf"
                   />
@@ -473,6 +668,17 @@ const OrdersWithCustomerPerItem = () => {
             `ثبت سفارشات (${filledCount} مورد پر شده)`
           )}
         </button>
+
+        {/* Re-print last bill */}
+        {lastBillItems && lastBillItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => printBillPdf(lastBillItems, currentUser)}
+            className="w-full flex items-center justify-center gap-2 bg-cyan-100 text-cyan-900 py-2 rounded-md hover:bg-cyan-200 transition"
+          >
+            <FaPrint /> چاپ مجدد آخرین فاکتور ({lastBillItems.length} قلم)
+          </button>
+        )}
       </div>
 
       <div className="mt-4">
