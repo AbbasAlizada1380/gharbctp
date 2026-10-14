@@ -13,6 +13,7 @@ import {
   FaCheckCircle,
   FaHourglassHalf,
   FaPrint,
+  FaTrash,
 } from "react-icons/fa";
 import Pagination from "../pagination/Pagination";
 import SelectedOrderItemsDownload from "./SelectedOrderItemsDownload";
@@ -30,10 +31,13 @@ const OrderItemsList = ({ refreshTrigger }) => {
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [perPage, setPerPage] = useState(20);
+  const [perPage, setPerPage] = useState(40);
   const [totalItems, setTotalItems] = useState(0);
   const [approving, setApproving] = useState(false);
   const [printingItem, setPrintingItem] = useState(null);
+
+  // 🔹 Delete state
+  const [deletingId, setDeletingId] = useState(null);
 
   // 🔹 Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,12 +91,51 @@ const OrderItemsList = ({ refreshTrigger }) => {
     }
   };
 
-/* ===========================
-   Print Single Order Item
-============================ */
-const handlePrintItem = (item) => {
-  generateOrderItemsPdf([item], currentUser);
-};
+  /* ===========================
+     Print Single Order Item
+  =========================== */
+  const handlePrintItem = (item) => {
+    generateOrderItemsPdf([item], currentUser);
+  };
+
+  /* ===========================
+     Delete Single Order Item
+  =========================== */
+  const handleDeleteItem = async (item) => {
+    if (deletingId !== null) return; // block other deletes / double-click
+
+    const confirmed = window.confirm(
+      `آیا از حذف سفارش #${item.id} مطمئن هستید؟\nاین عمل قابل بازگشت نیست.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(item.id);
+
+      await axios.delete(`${BASE_URL}/orderItems/${item.id}`);
+
+      // Remove locally
+      setOrderItems((prev) => prev.filter((i) => i.id !== item.id));
+      setSelectedItemIds((prev) => prev.filter((id) => id !== item.id));
+      setSelectedItemsData((prev) => prev.filter((i) => i.id !== item.id));
+
+      // If we were editing this item, exit edit mode
+      if (editingId === item.id) cancelEdit();
+
+      // If search is active, remove from search results too
+      if (searchActive) {
+        setSearchResults((prev) => prev.filter((i) => i.id !== item.id));
+      } else {
+        // Refresh to get accurate pagination totals
+        fetchOrderItems();
+      }
+    } catch (err) {
+      console.error("Error deleting order item:", err);
+      alert(err.response?.data?.message || "خطا در حذف سفارش");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   /* ===========================
      Search
@@ -295,8 +338,6 @@ const handlePrintItem = (item) => {
       setApproving(false);
     }
   };
-
-
 
   /* ===========================
      Helpers
@@ -511,232 +552,257 @@ const handlePrintItem = (item) => {
                 </td>
               </tr>
             ) : (
-              orderItems.map((item) => (
-                <tr
-                  key={item.id}
-                  className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${
-                    editingId === item.id ? "bg-yellow-50" : ""
-                  } ${searchActive ? "bg-blue-50/30" : ""} ${
-                    item.approved ? "bg-green-50/40" : ""
-                  }`}
-                >
-                  <td className="p-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedItemIds.includes(item.id)}
-                      onChange={() => toggleSelectItem(item)}
-                    />
-                  </td>
-                  <td className="p-3 text-gray-600">{item.id}</td>
-
-                  {/* File Name */}
-                  <td className="p-3">
-                    {editingId === item.id ? (
+              orderItems.map((item) => {
+                const isDeleting = deletingId === item.id;
+                return (
+                  <tr
+                    key={item.id}
+                    className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${
+                      editingId === item.id ? "bg-yellow-50" : ""
+                    } ${searchActive ? "bg-blue-50/30" : ""} ${
+                      item.approved ? "bg-green-50/40" : ""
+                    } ${isDeleting ? "opacity-50" : ""}`}
+                  >
+                    <td className="p-3">
                       <input
-                        type="text"
-                        value={editForm.fileName}
-                        onChange={(e) =>
-                          handleEditChange("fileName", e.target.value)
-                        }
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        placeholder="نام فایل"
+                        type="checkbox"
+                        checked={selectedItemIds.includes(item.id)}
+                        onChange={() => toggleSelectItem(item)}
+                        disabled={isDeleting}
                       />
-                    ) : (
-                      <div className="font-medium text-gray-800 max-w-xs truncate">
-                        {item.fileName || "—"}
-                      </div>
-                    )}
-                  </td>
+                    </td>
+                    <td className="p-3 text-gray-600">{item.id}</td>
 
-                  {/* Size */}
-                  <td className="p-3">
-                    {editingId === item.id ? (
-                      <input
-                        type="text"
-                        value={editForm.size}
-                        onChange={(e) =>
-                          handleEditChange("size", e.target.value)
-                        }
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        placeholder="سایز"
-                        required
-                      />
-                    ) : (
-                      <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
-                        {item.size}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Quantity */}
-                  <td className="p-3">
-                    {editingId === item.id ? (
-                      <input
-                        type="number"
-                        min="1"
-                        value={editForm.qnty}
-                        onChange={(e) =>
-                          handleEditChange("qnty", e.target.value)
-                        }
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center"
-                        placeholder="تعداد"
-                        required
-                      />
-                    ) : (
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
-                        {item.qnty}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Invoice Number */}
-                  <td className="p-3">
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
-                      {item.invoiceNumber || 0}
-                    </span>
-                  </td>
-
-                  {/* Customer Name */}
-                  <td className="p-3">
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
-                      {item.customerName}
-                    </span>
-                  </td>
-
-                  {/* Price */}
-                  <td className="p-3">
-                    {editingId === item.id ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editForm.price}
-                        onChange={(e) =>
-                          handleEditChange("price", e.target.value)
-                        }
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center"
-                        placeholder="قیمت"
-                        required
-                      />
-                    ) : (
-                      <span className="text-green-700 font-semibold">
-                        {parseFloat(item.price || 0).toLocaleString("en-US")}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Money */}
-                  <td className="p-3">
-                    {editingId === item.id ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editForm.money}
-                        onChange={(e) =>
-                          handleEditChange("money", e.target.value)
-                        }
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center bg-gray-50"
-                        placeholder="مبلغ"
-                        required
-                        readOnly
-                        onFocus={(e) => e.target.removeAttribute("readonly")}
-                      />
-                    ) : (
-                      <span className="text-purple-700 font-bold">
-                        {parseFloat(item.money || 0).toLocaleString("en-US")}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Approval Status */}
-                  <td className="p-3">
-                    {item.approved ? (
-                      <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
-                        <FaCheckCircle />
-                        تایید شده
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-semibold">
-                        <FaHourglassHalf />
-                        در انتظار
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Date */}
-                  <td className="p-3 text-gray-500 text-sm">
-                    {formatDate(item.createdAt)}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="p-3">
-                    <div className="flex items-center justify-center gap-2">
-                      {/* 🖨️ Print button — available to everyone */}
-                      <button
-                        onClick={() => handlePrintItem(item)}
-                        className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg"
-                        title="چاپ این سفارش"
-                      >
-                        <FaPrint />
-                      </button>
-
-                      {/* ✏️ Edit button — admin only */}
-                      {currentUser?.role === "admin" && (
-                        <>
-                          {editingId === item.id ? (
-                            <>
-                              <button
-                                onClick={saveEdit}
-                                className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-                                title="ذخیره"
-                                disabled={!hasChanges()}
-                              >
-                                <FaSave />
-                              </button>
-
-                              <button
-                                onClick={cancelEdit}
-                                className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                                title="لغو"
-                              >
-                                <FaTimes />
-                              </button>
-
-                              {hasChanges() && (
-                                <button
-                                  onClick={() => {
-                                    setEditForm({
-                                      size: originalItem.size || "",
-                                      qnty: originalItem.qnty || "",
-                                      price: originalItem.price || "",
-                                      money: originalItem.money || "",
-                                      fileName: originalItem.fileName || "",
-                                    });
-                                  }}
-                                  className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-                                  title="بازنشانی"
-                                >
-                                  <FaUndo />
-                                </button>
-                              )}
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => startEdit(item)}
-                              className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg"
-                              title="ویرایش"
-                              disabled={editingId !== null}
-                            >
-                              <FaEdit />
-                            </button>
-                          )}
-                        </>
+                    {/* File Name */}
+                    <td className="p-3">
+                      {editingId === item.id ? (
+                        <input
+                          type="text"
+                          value={editForm.fileName}
+                          onChange={(e) =>
+                            handleEditChange("fileName", e.target.value)
+                          }
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                          placeholder="نام فایل"
+                        />
+                      ) : (
+                        <div className="font-medium text-gray-800 max-w-xs truncate">
+                          {item.fileName || "—"}
+                        </div>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+
+                    {/* Size */}
+                    <td className="p-3">
+                      {editingId === item.id ? (
+                        <input
+                          type="text"
+                          value={editForm.size}
+                          onChange={(e) =>
+                            handleEditChange("size", e.target.value)
+                          }
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                          placeholder="سایز"
+                          required
+                        />
+                      ) : (
+                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
+                          {item.size}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Quantity */}
+                    <td className="p-3">
+                      {editingId === item.id ? (
+                        <input
+                          type="number"
+                          min="1"
+                          value={editForm.qnty}
+                          onChange={(e) =>
+                            handleEditChange("qnty", e.target.value)
+                          }
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center"
+                          placeholder="تعداد"
+                          required
+                        />
+                      ) : (
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
+                          {item.qnty}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Invoice Number */}
+                    <td className="p-3">
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
+                        {item.invoiceNumber || 0}
+                      </span>
+                    </td>
+
+                    {/* Customer Name */}
+                    <td className="p-3">
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
+                        {item.customerName}
+                      </span>
+                    </td>
+
+                    {/* Price */}
+                    <td className="p-3">
+                      {editingId === item.id ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editForm.price}
+                          onChange={(e) =>
+                            handleEditChange("price", e.target.value)
+                          }
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center"
+                          placeholder="قیمت"
+                          required
+                        />
+                      ) : (
+                        <span className="text-green-700 font-semibold">
+                          {parseFloat(item.price || 0).toLocaleString("en-US")}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Money */}
+                    <td className="p-3">
+                      {editingId === item.id ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editForm.money}
+                          onChange={(e) =>
+                            handleEditChange("money", e.target.value)
+                          }
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-center bg-gray-50"
+                          placeholder="مبلغ"
+                          required
+                          readOnly
+                          onFocus={(e) => e.target.removeAttribute("readonly")}
+                        />
+                      ) : (
+                        <span className="text-purple-700 font-bold">
+                          {parseFloat(item.money || 0).toLocaleString("en-US")}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Approval Status */}
+                    <td className="p-3">
+                      {item.approved ? (
+                        <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
+                          <FaCheckCircle />
+                          تایید شده
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-semibold">
+                          <FaHourglassHalf />
+                          در انتظار
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Date */}
+                    <td className="p-3 text-gray-500 text-sm">
+                      {formatDate(item.createdAt)}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="p-3">
+                      <div className="flex items-center justify-center gap-2">
+                        {/* 🖨️ Print button — available to everyone */}
+                        <button
+                          onClick={() => handlePrintItem(item)}
+                          className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg"
+                          title="چاپ این سفارش"
+                          disabled={isDeleting}
+                        >
+                          <FaPrint />
+                        </button>
+
+                        {/* 🗑️ Delete button — admin only */}
+                        {currentUser?.role === "admin" && (
+                          <button
+                            onClick={() => handleDeleteItem(item)}
+                            disabled={deletingId !== null || editingId !== null}
+                            className={`p-2 rounded-lg ${
+                              deletingId !== null || editingId !== null
+                                ? "text-gray-300 cursor-not-allowed"
+                                : "text-red-600 hover:bg-red-50"
+                            }`}
+                            title="حذف این سفارش"
+                          >
+                            {isDeleting ? (
+                              <FaSpinner className="animate-spin" />
+                            ) : (
+                              <FaTrash />
+                            )}
+                          </button>
+                        )}
+
+                        {/* ✏️ Edit button — admin only */}
+                        {currentUser?.role === "admin" && (
+                          <>
+                            {editingId === item.id ? (
+                              <>
+                                <button
+                                  onClick={saveEdit}
+                                  className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                                  title="ذخیره"
+                                  disabled={!hasChanges()}
+                                >
+                                  <FaSave />
+                                </button>
+
+                                <button
+                                  onClick={cancelEdit}
+                                  className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                  title="لغو"
+                                >
+                                  <FaTimes />
+                                </button>
+
+                                {hasChanges() && (
+                                  <button
+                                    onClick={() => {
+                                      setEditForm({
+                                        size: originalItem.size || "",
+                                        qnty: originalItem.qnty || "",
+                                        price: originalItem.price || "",
+                                        money: originalItem.money || "",
+                                        fileName: originalItem.fileName || "",
+                                      });
+                                    }}
+                                    className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                                    title="بازنشانی"
+                                  >
+                                    <FaUndo />
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => startEdit(item)}
+                                className="p-2 text-cyan-700 hover:bg-cyan-50 rounded-lg"
+                                title="ویرایش"
+                                disabled={editingId !== null || deletingId !== null}
+                              >
+                                <FaEdit />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -792,11 +858,6 @@ const handlePrintItem = (item) => {
 ============================================================ */
 const SingleItemPrinter = ({ item, onDone }) => {
   useEffect(() => {
-    // Render SelectedOrderItemsDownload and click its button programmatically.
-    // We do this by rendering it inside a tiny hidden container and
-    // simulating the click via a ref to its button is complex,
-    // so instead we render the visible button in a 1x1 hidden div and
-    // dispatch a real click on it.
     const timer = setTimeout(() => {
       const btn = document.getElementById("__single_print_btn");
       if (btn) btn.click();

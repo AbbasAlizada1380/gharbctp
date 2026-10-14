@@ -518,17 +518,96 @@ export const updateOrderItemProperties = async (req, res) => {
 /* ===========================
    Delete Order Item
 =========================== */
+
+
 export const deleteOrderItem = async (req, res) => {
   try {
     const { id } = req.params;
+    const orderItemId = Number(id);
 
-    const item = await OrderItem.findByPk(id);
+    if (!Number.isFinite(orderItemId)) {
+      return res.status(400).json({ message: "Invalid order item id" });
+    }
+
+    /* ---------- 1. Find the order item ---------- */
+    const item = await OrderItem.findByPk(orderItemId);
     if (!item) {
       return res.status(404).json({ message: "Order item not found" });
     }
 
+    const customerId = item.customerId;
+
+    /* ---------- 2. Delete the order item ---------- */
     await item.destroy();
-    res.json({ message: "Order item deleted successfully" });
+
+    /* ---------- 3. Clean up the matching Remain row ----------
+       Find the Remain record whose customerId matches the item's
+       customerId, then strip the deleted item id from all three
+       arrays: orderId, remainOrders, receiptOrders.              */
+    if (customerId == null) {
+      return res.json({
+        message: "Order item deleted successfully",
+        deletedOrderItemId: orderItemId,
+        updatedRemains: [],
+        note: "Order item had no customerId; no Remain row touched",
+      });
+    }
+
+    const remain = await Remain.findOne({ where: { customerId } });
+
+    if (!remain) {
+      return res.json({
+        message: "Order item deleted successfully",
+        deletedOrderItemId: orderItemId,
+        updatedRemains: [],
+        note: "No Remain row found for this customer",
+      });
+    }
+
+    let changed = false;
+
+    // The model's getters already coerce to arrays, so we can
+    // filter directly.
+    const beforeOrderId = remain.orderId;
+    const beforeRemainOrders = remain.remainOrders;
+    const beforeReceiptOrders = remain.receiptOrders;
+
+    remain.orderId = beforeOrderId.filter(
+      (rid) => Number(rid) !== orderItemId
+    );
+    remain.remainOrders = beforeRemainOrders.filter(
+      (rid) => Number(rid) !== orderItemId
+    );
+    remain.receiptOrders = beforeReceiptOrders.filter(
+      (rid) => Number(rid) !== orderItemId
+    );
+
+    if (remain.orderId.length !== beforeOrderId.length) changed = true;
+    if (remain.remainOrders.length !== beforeRemainOrders.length)
+      changed = true;
+    if (remain.receiptOrders.length !== beforeReceiptOrders.length)
+      changed = true;
+
+    if (changed) {
+      const allEmpty =
+        remain.orderId.length === 0 &&
+        remain.remainOrders.length === 0 &&
+        remain.receiptOrders.length === 0;
+
+      if (allEmpty) {
+        await remain.destroy();
+      } else {
+        await remain.save();
+      }
+    }
+
+    res.json({
+      message: "Order item deleted successfully",
+      deletedOrderItemId: orderItemId,
+      customerId,
+      updatedRemains: changed ? [remain.id] : [],
+      remainDeleted: changed && remain.isNewRecord === false ? false : undefined,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({
