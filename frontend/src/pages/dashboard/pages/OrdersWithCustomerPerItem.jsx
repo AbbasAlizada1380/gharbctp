@@ -36,6 +36,8 @@ const createEmptyOrderItems = (count = 5) => {
    BUT opens the print dialog directly (no download)
 ============================================================ */
 const printBillPdf = (billItems, currentUser) => {
+  console.log(billItems);
+
   if (!billItems || billItems.length === 0) {
     alert("هیچ سفارشی برای چاپ وجود ندارد");
     return;
@@ -83,7 +85,7 @@ const printBillPdf = (billItems, currentUser) => {
   const headers = [["تعداد", "سایز", "نام فایل", "شماره"]];
 
   const body = billItems.map((item, idx) => {
-    const id = item.invoiceNumber ?? item.id ?? idx + 1;
+    const id = item.id;
     const customer = item.customerName || "—";
     return [
       item.qnty ?? "—",
@@ -298,7 +300,7 @@ const OrdersWithCustomerPerItem = () => {
         if ([sizeCol, fileCol, qntyCol, customerCol].includes(-1)) {
           alert(
             "ستون‌های مورد نیاز یافت نشدند. لطفاً از ستون‌های زیر استفاده کنید:\n" +
-              "سایز, نام فایل, تعداد, مشتری"
+            "سایز, نام فایل, تعداد, مشتری"
           );
           setUploadingFile(false);
           return;
@@ -411,32 +413,36 @@ const OrdersWithCustomerPerItem = () => {
 
       try {
         const res = await axios.post(`${BASE_URL}/orderItems`, payload);
+        const data = res.data;
 
-        const responseOrder =
-          res.data?.order ||
-          res.data?.orderItem ||
-          res.data?.createdOrder ||
-          res.data;
+        // Extract the newly created order item (has the real DB id)
+        const createdItem =
+          data?.orderItems?.[0] ||
+          data?.order?.orderItems?.[0] ||
+          data?.orderItem ||
+          data?.createdOrder ||
+          null;
+
+        // Customer info comes back on the response too (fallback to local lookup)
+        const customerName =
+          data?.customer?.fullname || customerObj?.fullname || "—";
+        const customerPhone =
+          data?.customer?.phoneNumber || customerObj?.phoneNumber || "";
 
         billItems.push({
-          id: responseOrder?.id ?? null,
+          id: createdItem?.id ?? null,
           invoiceNumber:
-            responseOrder?.invoiceNumber ??
-            responseOrder?.orderItems?.[0]?.invoiceNumber ??
+            createdItem?.invoiceNumber ??
+            data?.order?.invoiceNumber ??
             null,
-          customerName: customerObj?.fullname || "—",
-          customerPhone: customerObj?.phoneNumber || "",
-          size: item.size,
-          fileName: item.fileName,
-          qnty: Number(item.qnty) || 0,
-          price:
-            responseOrder?.orderItems?.[0]?.price ??
-            responseOrder?.price ??
-            null,
-          total:
-            responseOrder?.orderItems?.[0]?.total ??
-            responseOrder?.total ??
-            null,
+          customerName,
+          customerPhone,
+          size: createdItem?.size ?? item.size,
+          fileName: createdItem?.fileName ?? item.fileName,
+          qnty: createdItem?.qnty ?? (Number(item.qnty) || 0),
+          price: createdItem?.price ?? null,
+          money: createdItem?.money ?? null,
+          total: createdItem?.money ?? createdItem?.price * (Number(item.qnty) || 0) ?? null,
         });
 
         successCount++;
@@ -653,11 +659,10 @@ const OrdersWithCustomerPerItem = () => {
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className={`w-full py-3 rounded-md transition ${
-            submitting
+          className={`w-full py-3 rounded-md transition ${submitting
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-cyan-800 text-white hover:bg-cyan-900"
-          }`}
+            }`}
         >
           {submitting ? (
             <span className="flex items-center justify-center gap-2">
