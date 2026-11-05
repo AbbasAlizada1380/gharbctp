@@ -35,7 +35,7 @@ const OrderItemsList = ({ refreshTrigger }) => {
   const [totalItems, setTotalItems] = useState(0);
   const [approving, setApproving] = useState(false);
   const [printingItem, setPrintingItem] = useState(null);
-
+  const [approvingId, setApprovingId] = useState(null);
   // 🔹 Delete state
   const [deletingId, setDeletingId] = useState(null);
 
@@ -98,6 +98,47 @@ const OrderItemsList = ({ refreshTrigger }) => {
     generateOrderItemsPdf([item], currentUser);
   };
 
+  /* ===========================
+   Approve Single Item
+=========================== */
+const handleApproveSingle = async (item) => {
+  if (item.approved) return;
+  if (approvingId !== null) return; // block concurrent single approvals
+
+  const confirmed = window.confirm(
+    `آیا از تایید سفارش #${item.id} مطمئن هستید؟\nموجودی گدام پس از تایید کاهش می‌یابد.`
+  );
+  if (!confirmed) return;
+
+  try {
+    setApprovingId(item.id);
+
+    await axios.post(`${BASE_URL}/orderItems/approve`, {
+      orderItemIds: [item.id],
+    });
+
+    // Update locally
+    setOrderItems((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, approved: true } : i))
+    );
+    setSelectedItemsData((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, approved: true } : i))
+    );
+
+    if (searchActive) {
+      setSearchResults((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, approved: true } : i))
+      );
+    }
+
+    alert(`✅ سفارش #${item.id} تایید شد`);
+  } catch (err) {
+    console.error("Error approving item:", err);
+    alert(err.response?.data?.error || "خطا در تایید سفارش");
+  } finally {
+    setApprovingId(null);
+  }
+};
   /* ===========================
      Delete Single Order Item
   =========================== */
@@ -323,9 +364,9 @@ const OrderItemsList = ({ refreshTrigger }) => {
 
       alert(
         `✅ ${res.data.approvedCount} مورد تایید شد` +
-          (res.data.skippedCount
-            ? ` (${res.data.skippedCount} مورد قبلا تایید شده بود)`
-            : "")
+        (res.data.skippedCount
+          ? ` (${res.data.skippedCount} مورد قبلا تایید شده بود)`
+          : "")
       );
 
       setSelectedItemIds([]);
@@ -540,8 +581,8 @@ const OrderItemsList = ({ refreshTrigger }) => {
                       {searchActive
                         ? "هیچ نتیجه‌ای یافت نشد"
                         : currentUser?.role === "designer"
-                        ? "شما هنوز سفارشی ثبت نکرده‌اید"
-                        : "هیچ سفارشی یافت نشد"}
+                          ? "شما هنوز سفارشی ثبت نکرده‌اید"
+                          : "هیچ سفارشی یافت نشد"}
                     </p>
                     <p className="text-sm text-gray-400">
                       {searchActive
@@ -557,19 +598,36 @@ const OrderItemsList = ({ refreshTrigger }) => {
                 return (
                   <tr
                     key={item.id}
-                    className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${
-                      editingId === item.id ? "bg-yellow-50" : ""
-                    } ${searchActive ? "bg-blue-50/30" : ""} ${
-                      item.approved ? "bg-green-50/40" : ""
-                    } ${isDeleting ? "opacity-50" : ""}`}
+                    className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${editingId === item.id ? "bg-yellow-50" : ""
+                      } ${searchActive ? "bg-blue-50/30" : ""} ${item.approved ? "bg-green-50/40" : ""
+                      } ${isDeleting ? "opacity-50" : ""}`}
                   >
                     <td className="p-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedItemIds.includes(item.id)}
-                        onChange={() => toggleSelectItem(item)}
-                        disabled={isDeleting}
-                      />
+                      <div className="flex items-center justify-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedItemIds.includes(item.id)}
+                          onChange={() => toggleSelectItem(item)}
+                          disabled={isDeleting}
+                        />
+                        {currentUser?.role === "admin" && !item.approved && (
+                          <button
+                            onClick={() => handleApproveSingle(item)}
+                            disabled={approving || isDeleting}
+                            className={`p-1.5 rounded-full transition-colors ${approving
+                              ? "text-gray-300 cursor-not-allowed"
+                              : "text-green-600 hover:bg-green-100"
+                              }`}
+                            title="تایید این سفارش"
+                          >
+                            {approving ? (
+                              <FaSpinner className="animate-spin text-xs" />
+                            ) : (
+                              <FaCheckCircle className="text-sm" />
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3 text-gray-600">{item.id}</td>
 
@@ -731,11 +789,10 @@ const OrderItemsList = ({ refreshTrigger }) => {
                           <button
                             onClick={() => handleDeleteItem(item)}
                             disabled={deletingId !== null || editingId !== null}
-                            className={`p-2 rounded-lg ${
-                              deletingId !== null || editingId !== null
-                                ? "text-gray-300 cursor-not-allowed"
-                                : "text-red-600 hover:bg-red-50"
-                            }`}
+                            className={`p-2 rounded-lg ${deletingId !== null || editingId !== null
+                              ? "text-gray-300 cursor-not-allowed"
+                              : "text-red-600 hover:bg-red-50"
+                              }`}
                             title="حذف این سفارش"
                           >
                             {isDeleting ? (
